@@ -1,4 +1,4 @@
-package com.example.ecommerce.service.interfaces;
+package interfaces;
 
 import com.example.ecommerce.dto.ProductRequest;
 import com.example.ecommerce.dto.ProductResponse;

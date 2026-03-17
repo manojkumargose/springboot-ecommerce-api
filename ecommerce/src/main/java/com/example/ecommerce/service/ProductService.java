@@ -7,6 +7,9 @@ import com.example.ecommerce.entity.Product;
 import com.example.ecommerce.exception.ResourceNotFoundException;
 import com.example.ecommerce.repository.CategoryRepository;
 import com.example.ecommerce.repository.ProductRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -38,7 +41,11 @@ public class ProductService {
     }
 
     // ─── Add Product ──────────────────────────────────────────
+    // Evicts all products cache when new product is added
 
+    @Caching(evict = {
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public ProductResponse addProduct(ProductRequest request) {
         Category category = categoryRepository.findById(request.getCategoryId())
                 .orElseThrow(() -> new ResourceNotFoundException("Category not found"));
@@ -54,8 +61,11 @@ public class ProductService {
     }
 
     // ─── Get All Products ─────────────────────────────────────
+    // Cached — DB is only hit once, then served from memory
 
+    @Cacheable(value = "products")
     public List<ProductResponse> getAllProducts() {
+        System.out.println("Fetching all products from DB...");
         return productRepository.findAll()
                 .stream()
                 .map(this::mapToResponse)
@@ -63,29 +73,44 @@ public class ProductService {
     }
 
     // ─── Get Product By ID ────────────────────────────────────
+    // Cached per product ID
 
+    @Cacheable(value = "product", key = "#id")
     public ProductResponse getProductById(Long id) {
+        System.out.println("Fetching product from DB: " + id);
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
         return mapToResponse(product);
     }
 
     // ─── Search Products ──────────────────────────────────────
+    // Not cached because results vary by many params
 
-    public Page<ProductResponse> searchProducts(String search, Long categoryId, Pageable pageable) {
-        return productRepository.searchProducts(search, categoryId, pageable)
+    public Page<ProductResponse> searchProducts(
+            String search, Long categoryId,
+            Double minPrice, Double maxPrice,
+            Pageable pageable) {
+        return productRepository
+                .searchProducts(search, categoryId, minPrice, maxPrice, pageable)
                 .map(this::mapToResponse);
     }
 
-    // ─── Search Available Products ────────────────────────────
-
-    public Page<ProductResponse> searchAvailableProducts(String search, Long categoryId, Pageable pageable) {
-        return productRepository.searchAvailableProducts(search, categoryId, pageable)
+    public Page<ProductResponse> searchAvailableProducts(
+            String search, Long categoryId,
+            Double minPrice, Double maxPrice,
+            Pageable pageable) {
+        return productRepository
+                .searchAvailableProducts(search, categoryId, minPrice, maxPrice, pageable)
                 .map(this::mapToResponse);
     }
 
     // ─── Update Product ───────────────────────────────────────
+    // Evicts both product by ID and all products list cache
 
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#id"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public ProductResponse updateProduct(Long id, ProductRequest request) {
         Product existing = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
@@ -103,12 +128,16 @@ public class ProductService {
     }
 
     // ─── Delete Product ───────────────────────────────────────
+    // Evicts both caches on delete
 
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#id"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public void deleteProduct(Long id) {
         Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + id));
 
-        // ── Delete image from Cloudinary if exists ────────────
         if (product.getImagePublicId() != null) {
             try {
                 cloudinaryService.deleteImage(product.getImagePublicId());
@@ -121,8 +150,13 @@ public class ProductService {
     }
 
     // ─── Reduce Stock ─────────────────────────────────────────
+    // Evicts product cache since stock changed
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#productId"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public void reduceStock(Long productId, int quantity) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
@@ -138,8 +172,13 @@ public class ProductService {
     }
 
     // ─── Restore Stock ────────────────────────────────────────
+    // Evicts product cache since stock changed
 
     @Transactional
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#productId"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public void restoreStock(Long productId, int quantity) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
@@ -149,6 +188,7 @@ public class ProductService {
     }
 
     // ─── Low Stock Products ───────────────────────────────────
+    // Not cached — stock changes frequently
 
     public List<ProductResponse> getLowStockProducts(int threshold) {
         return productRepository.findLowStockProducts(threshold)
@@ -158,6 +198,7 @@ public class ProductService {
     }
 
     // ─── Out of Stock Products ────────────────────────────────
+    // Not cached — stock changes frequently
 
     public List<ProductResponse> getOutOfStockProducts() {
         return productRepository.findByInStockFalse()
@@ -167,19 +208,22 @@ public class ProductService {
     }
 
     // ─── Upload Product Image ─────────────────────────────────
+    // Evicts product cache since image changed
 
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#productId"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public ProductResponse uploadProductImage(Long productId, MultipartFile file) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Product not found: " + productId));
 
         try {
-            // ── Delete old image if exists ────────────────────
             if (product.getImagePublicId() != null) {
                 cloudinaryService.deleteImage(product.getImagePublicId());
             }
 
-            // ── Upload new image ──────────────────────────────
             Map result = cloudinaryService.uploadImage(file, "ecommerce/products");
             product.setImageUrl((String) result.get("secure_url"));
             product.setImagePublicId((String) result.get("public_id"));
@@ -191,7 +235,12 @@ public class ProductService {
     }
 
     // ─── Delete Product Image ─────────────────────────────────
+    // Evicts product cache since image changed
 
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#productId"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
     public ProductResponse deleteProductImage(Long productId) {
         Product product = productRepository.findById(productId)
                 .orElseThrow(() -> new ResourceNotFoundException(

@@ -18,15 +18,13 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/products")
-public class ProductController {
+public class productController {
 
     private final ProductService productService;
 
-    public ProductController(ProductService productService) {
+    public productController(ProductService productService) {
         this.productService = productService;
     }
-
-    // ─── Add Product (Admin Only) ─────────────────────────────
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
@@ -36,13 +34,13 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Product added successfully", saved));
     }
 
-    // ─── Get All Products (Admin) ─────────────────────────────
-
     @GetMapping("/all")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAllProducts(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
@@ -53,16 +51,17 @@ public class ProductController {
                 : Sort.by(sortBy).ascending();
 
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ProductResponse> products = productService.searchProducts(search, categoryId, pageable);
+        Page<ProductResponse> products = productService.searchProducts(
+                search, categoryId, minPrice, maxPrice, pageable);
         return ResponseEntity.ok(ApiResponse.success("Products fetched", products));
     }
-
-    // ─── Get Available Products (Buyers) ──────────────────────
 
     @GetMapping
     public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAvailableProducts(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) Long categoryId,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
@@ -73,11 +72,10 @@ public class ProductController {
                 : Sort.by(sortBy).ascending();
 
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ProductResponse> products = productService.searchAvailableProducts(search, categoryId, pageable);
+        Page<ProductResponse> products = productService.searchAvailableProducts(
+                search, categoryId, minPrice, maxPrice, pageable);
         return ResponseEntity.ok(ApiResponse.success("Products fetched", products));
     }
-
-    // ─── Get Product By ID ────────────────────────────────────
 
     @GetMapping("/{id}")
     public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
@@ -85,8 +83,6 @@ public class ProductController {
         return ResponseEntity.ok(
                 ApiResponse.success("Product fetched", productService.getProductById(id)));
     }
-
-    // ─── Update Product (Admin Only) ──────────────────────────
 
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
@@ -97,8 +93,6 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Product updated successfully", updated));
     }
 
-    // ─── Delete Product (Admin Only) ──────────────────────────
-
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteProduct(
@@ -106,8 +100,6 @@ public class ProductController {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
     }
-
-    // ─── Low Stock Products (Admin Only) ──────────────────────
 
     @GetMapping("/low-stock")
     @PreAuthorize("hasRole('ADMIN')")
@@ -117,16 +109,12 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Low stock products fetched", products));
     }
 
-    // ─── Out of Stock Products (Admin Only) ───────────────────
-
     @GetMapping("/out-of-stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getOutOfStockProducts() {
         List<ProductResponse> products = productService.getOutOfStockProducts();
         return ResponseEntity.ok(ApiResponse.success("Out of stock products fetched", products));
     }
-
-    // ─── Update Stock Only (Admin Only) ───────────────────────
 
     @PatchMapping("/{id}/stock")
     @PreAuthorize("hasRole('ADMIN')")
@@ -137,8 +125,6 @@ public class ProductController {
         return ResponseEntity.ok(ApiResponse.success("Stock updated successfully", null));
     }
 
-    // ─── Upload Product Image (Admin Only) ────────────────────
-
     @PostMapping("/{id}/image")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> uploadImage(
@@ -148,8 +134,6 @@ public class ProductController {
                 "Image uploaded successfully",
                 productService.uploadProductImage(id, file)));
     }
-
-    // ─── Delete Product Image (Admin Only) ────────────────────
 
     @DeleteMapping("/{id}/image")
     @PreAuthorize("hasRole('ADMIN')")

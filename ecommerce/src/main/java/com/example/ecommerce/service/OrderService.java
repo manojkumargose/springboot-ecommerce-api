@@ -39,8 +39,6 @@ public class OrderService {
         this.emailService = emailService;
     }
 
-    // ─── Place Order ──────────────────────────────────────────
-
     @Transactional
     public OrderResponse placeOrder(OrderRequest request) {
         String username = SecurityContextHolder.getContext()
@@ -74,7 +72,6 @@ public class OrderService {
         order.setItems(items);
         order.setTotalAmount(total);
 
-        // ── Apply coupon if provided ──────────────────────────
         if (request.getCouponCode() != null
                 && !request.getCouponCode().isEmpty()) {
             Coupon coupon = couponService.validateCoupon(
@@ -91,15 +88,17 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
 
-        // ── Send order confirmation email ─────────────────────
         if (user.getEmail() != null && !user.getEmail().isEmpty()) {
-            emailService.sendOrderPlacedEmail(user.getEmail(), saved);
+            try {
+                emailService.sendOrderPlacedEmail(user.getEmail(), saved);
+            } catch (Exception e) {
+                System.err.println("Order confirmation email failed for order #"
+                        + saved.getId() + ": " + e.getMessage());
+            }
         }
 
         return toResponsePublic(saved);
     }
-
-    // ─── Get My Orders ────────────────────────────────────────
 
     public List<OrderResponse> getMyOrders() {
         String username = SecurityContextHolder.getContext()
@@ -112,16 +111,12 @@ public class OrderService {
                 .collect(Collectors.toList());
     }
 
-    // ─── Get All Orders (Admin) ───────────────────────────────
-
     public List<OrderResponse> getAllOrders() {
         return orderRepository.findAll()
                 .stream()
                 .map(this::toResponsePublic)
                 .collect(Collectors.toList());
     }
-
-    // ─── Update Order Status (Admin) ──────────────────────────
 
     @Transactional
     public OrderResponse updateStatus(Long orderId, String status) {
@@ -148,16 +143,18 @@ public class OrderService {
         order.setStatus(status.toUpperCase());
         Order saved = orderRepository.save(order);
 
-        // ── Send status update email ──────────────────────────
         String userEmail = saved.getUser().getEmail();
         if (userEmail != null && !userEmail.isEmpty()) {
-            emailService.sendOrderStatusEmail(userEmail, orderId, status);
+            try {
+                emailService.sendOrderStatusEmail(userEmail, orderId, status);
+            } catch (Exception e) {
+                System.err.println("Status update email failed for order #"
+                        + orderId + ": " + e.getMessage());
+            }
         }
 
         return toResponsePublic(saved);
     }
-
-    // ─── Cancel My Order (User) ───────────────────────────────
 
     @Transactional
     public OrderResponse cancelMyOrder(Long orderId) {
@@ -186,15 +183,17 @@ public class OrderService {
         order.setStatus("CANCELLED");
         Order saved = orderRepository.save(order);
 
-        // ── Send cancellation email ───────────────────────────
         if (user.getEmail() != null && !user.getEmail().isEmpty()) {
-            emailService.sendOrderCancelledEmail(user.getEmail(), orderId);
+            try {
+                emailService.sendOrderCancelledEmail(user.getEmail(), orderId);
+            } catch (Exception e) {
+                System.err.println("Cancellation email failed for order #"
+                        + orderId + ": " + e.getMessage());
+            }
         }
 
         return toResponsePublic(saved);
     }
-
-    // ─── Map to Response (Public) ─────────────────────────────
 
     public OrderResponse toResponsePublic(Order order) {
         OrderResponse response = new OrderResponse();

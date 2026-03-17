@@ -17,10 +17,7 @@ public class EmailService {
         this.mailSender = mailSender;
     }
 
-    // ─── Send Simple Email ────────────────────────────────────
-
-    @Async
-    public void sendEmail(String to, String subject, String body) {
+    private void sendEmail(String to, String subject, String body) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(message, true);
@@ -28,29 +25,26 @@ public class EmailService {
             helper.setSubject(subject);
             helper.setText(body, true);
             mailSender.send(message);
+            System.out.println("Email sent successfully to: " + to);
         } catch (MessagingException e) {
-            System.err.println("Failed to send email: " + e.getMessage());
+            System.err.println("Failed to send email to " + to + ": " + e.getMessage());
         }
     }
 
-    // ─── Welcome Email ────────────────────────────────────────
-
-    @Async
+    @Async("emailTaskExecutor")
     public void sendWelcomeEmail(String to, String username) {
-        String subject = "Welcome to Our Store! 🎉";
+        String subject = "Welcome to Our Store!";
         String body = """
                 <h2>Welcome, %s!</h2>
                 <p>Thank you for registering at our store.</p>
                 <p>Start shopping now and enjoy exclusive deals!</p>
                 <br>
-                <p>Happy Shopping! 🛍️</p>
+                <p>Happy Shopping!</p>
                 """.formatted(username);
         sendEmail(to, subject, body);
     }
 
-    // ─── Order Placed Email ───────────────────────────────────
-
-    @Async
+    @Async("emailTaskExecutor")
     public void sendOrderPlacedEmail(String to, Order order) {
         String subject = "Order Confirmed! #" + order.getId();
 
@@ -59,12 +53,12 @@ public class EmailService {
             items.append("<tr>")
                     .append("<td>").append(item.getProduct().getName()).append("</td>")
                     .append("<td>").append(item.getQuantity()).append("</td>")
-                    .append("<td>₹").append(item.getPrice()).append("</td>")
+                    .append("<td>Rs.").append(item.getPrice()).append("</td>")
                     .append("</tr>");
         });
 
         String body = """
-                <h2>Order Confirmed! 🎉</h2>
+                <h2>Order Confirmed!</h2>
                 <p>Thank you for your order. Here are your order details:</p>
                 <p><b>Order ID:</b> #%d</p>
                 <p><b>Status:</b> %s</p>
@@ -77,9 +71,9 @@ public class EmailService {
                     %s
                 </table>
                 <br>
-                <p><b>Total Amount:</b> ₹%s</p>
+                <p><b>Total Amount:</b> Rs.%s</p>
                 %s
-                <p><b>Final Amount:</b> ₹%s</p>
+                <p><b>Final Amount:</b> Rs.%s</p>
                 <br>
                 <p>We will notify you when your order is shipped!</p>
                 """.formatted(
@@ -88,7 +82,7 @@ public class EmailService {
                 items.toString(),
                 order.getTotalAmount(),
                 order.getDiscountAmount() > 0
-                        ? "<p><b>Discount:</b> -₹" + order.getDiscountAmount() + "</p>"
+                        ? "<p><b>Discount:</b> -Rs." + order.getDiscountAmount() + "</p>"
                         : "",
                 order.getFinalAmount()
         );
@@ -96,17 +90,15 @@ public class EmailService {
         sendEmail(to, subject, body);
     }
 
-    // ─── Order Status Update Email ────────────────────────────
-
-    @Async
+    @Async("emailTaskExecutor")
     public void sendOrderStatusEmail(String to, Long orderId, String status) {
         String subject = "Order #" + orderId + " Status Update";
 
         String statusMessage = switch (status.toUpperCase()) {
-            case "CONFIRMED" -> "Your order has been confirmed! ✅";
-            case "SHIPPED" -> "Your order has been shipped! 🚚";
-            case "DELIVERED" -> "Your order has been delivered! 📦";
-            case "CANCELLED" -> "Your order has been cancelled. ❌";
+            case "CONFIRMED" -> "Your order has been confirmed!";
+            case "SHIPPED" -> "Your order has been shipped!";
+            case "DELIVERED" -> "Your order has been delivered!";
+            case "CANCELLED" -> "Your order has been cancelled.";
             default -> "Your order status has been updated to: " + status;
         };
 
@@ -121,13 +113,11 @@ public class EmailService {
         sendEmail(to, subject, body);
     }
 
-    // ─── Order Cancelled Email ────────────────────────────────
-
-    @Async
+    @Async("emailTaskExecutor")
     public void sendOrderCancelledEmail(String to, Long orderId) {
         String subject = "Order #" + orderId + " Cancelled";
         String body = """
-                <h2>Order Cancelled ❌</h2>
+                <h2>Order Cancelled</h2>
                 <p>Your order <b>#%d</b> has been cancelled.</p>
                 <p>If you paid for this order, a refund will be processed shortly.</p>
                 <br>

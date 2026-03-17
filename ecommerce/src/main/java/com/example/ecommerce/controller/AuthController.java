@@ -8,7 +8,9 @@ import com.example.ecommerce.security.JwtUtil;
 import com.example.ecommerce.security.TokenBlacklistService;
 import com.example.ecommerce.service.EmailService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -42,8 +44,6 @@ public class AuthController {
         this.emailService = emailService;
     }
 
-    // ─── Register ─────────────────────────────────────────────
-
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Map<String, String>>> register(
             @Valid @RequestBody AuthRequest request) {
@@ -60,7 +60,6 @@ public class AuthController {
         user.setEmail(request.getEmail());
         userRepository.save(user);
 
-        // ── Send welcome email if email provided ──────────────
         if (request.getEmail() != null && !request.getEmail().isEmpty()) {
             emailService.sendWelcomeEmail(request.getEmail(), request.getUsername());
         }
@@ -75,7 +74,32 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Registration successful", tokens));
     }
 
-    // ─── Login ────────────────────────────────────────────────
+    @PostMapping("/register/admin")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<ApiResponse<Map<String, String>>> registerAdmin(
+            @Valid @RequestBody AuthRequest request) {
+
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Username already exists"));
+        }
+
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRole("ROLE_ADMIN");
+        user.setEmail(request.getEmail());
+        userRepository.save(user);
+
+        String accessToken = jwtUtil.generateToken(request.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(request.getUsername());
+
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("accessToken", accessToken);
+        tokens.put("refreshToken", refreshToken);
+
+        return ResponseEntity.ok(ApiResponse.success("Admin registered successfully", tokens));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Map<String, String>>> login(
@@ -93,21 +117,49 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Login successful", tokens));
     }
 
-    // ─── Refresh Token ────────────────────────────────────────
-
     @PostMapping("/refresh")
     public ResponseEntity<ApiResponse<Map<String, String>>> refresh(
             @RequestHeader("Authorization") String authHeader) {
+
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Missing or invalid Authorization header"));
+        }
+
         String refreshToken = authHeader.substring(7);
+
+        if (tokenBlacklistService.isBlacklisted(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Refresh token has been revoked"));
+        }
+
+        if (jwtUtil.isTokenExpired(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Refresh token has expired, please login again"));
+        }
+
+        if (!jwtUtil.isRefreshToken(refreshToken)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Invalid token type"));
+        }
+
         String username = jwtUtil.extractUsername(refreshToken);
+        if (userRepository.findByUsername(username).isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("User not found"));
+        }
+
+        tokenBlacklistService.blacklistToken(refreshToken);
+
         String newAccessToken = jwtUtil.generateToken(username);
+        String newRefreshToken = jwtUtil.generateRefreshToken(username);
 
         Map<String, String> tokens = new HashMap<>();
         tokens.put("accessToken", newAccessToken);
+        tokens.put("refreshToken", newRefreshToken);
+
         return ResponseEntity.ok(ApiResponse.success("Token refreshed", tokens));
     }
-
-    // ─── Logout ───────────────────────────────────────────────
 
     @PostMapping("/logout")
     public ResponseEntity<ApiResponse<Void>> logout(

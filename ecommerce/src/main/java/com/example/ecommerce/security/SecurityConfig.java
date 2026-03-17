@@ -37,18 +37,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                // ── Auth ──────────────────────────────────
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/register",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
-                                // ── Public Product & Category ──────────────
                                 "/api/v1/products",
                                 "/api/v1/products/{id}",
                                 "/api/v1/categories",
                                 "/api/v1/products/*/reviews",
                                 "/api/v1/products/*/reviews/rating",
-                                // ── Swagger UI ────────────────────────────
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
@@ -56,6 +53,7 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(sess -> sess
