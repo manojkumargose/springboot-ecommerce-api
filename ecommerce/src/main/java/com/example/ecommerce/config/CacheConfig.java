@@ -1,4 +1,4 @@
-package com.example.ecommerce;
+package com.example.ecommerce.config;
 
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
