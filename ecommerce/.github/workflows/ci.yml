@@ -28,6 +28,9 @@ jobs:
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
           restore-keys: ${{ runner.os }}-m2
 
+      - name: Make mvnw executable
+        run: chmod +x ecommerce/mvnw
+
       - name: Run tests
         working-directory: ecommerce
         run: ./mvnw test
