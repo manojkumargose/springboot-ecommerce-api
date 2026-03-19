@@ -17,8 +17,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
       - name: Deploy to Railway
-        uses: bervProject/railway-deploy@main
-        with:
-          railway_token: "${{ secrets.RAILWAY_TOKEN }}"
-          service: "${{ secrets.RAILWAY_SERVICE_ID }}"
+        run: "railway up --service ${{ secrets.RAILWAY_SERVICE_ID }}"
+        env:
+          RAILWAY_TOKEN: "${{ secrets.RAILWAY_TOKEN }}"
+          RAILWAY_PROJECT_ID: "02d94a61-ad88-4832-a11c-b8bac66018bd"
