@@ -74,6 +74,32 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success("Registration successful", tokens));
     }
 
+    @PostMapping("/register-admin")
+    public ResponseEntity<ApiResponse<Map<String, String>>> registerAdminPublic(
+            @Valid @RequestBody AuthRequest request) {
+
+        if (userRepository.findByUsername(request.getUsername()).isPresent()) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Username already exists"));
+        }
+
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setRole("ROLE_ADMIN");
+        user.setEmail(request.getEmail());
+        userRepository.save(user);
+
+        String accessToken = jwtUtil.generateToken(request.getUsername());
+        String refreshToken = jwtUtil.generateRefreshToken(request.getUsername());
+
+        Map<String, String> tokens = new HashMap<>();
+        tokens.put("accessToken", accessToken);
+        tokens.put("refreshToken", refreshToken);
+
+        return ResponseEntity.ok(ApiResponse.success("Admin registered successfully", tokens));
+    }
+
     @PostMapping("/register/admin")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, String>>> registerAdmin(

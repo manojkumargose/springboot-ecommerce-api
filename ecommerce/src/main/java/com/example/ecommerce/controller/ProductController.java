@@ -1,146 +1,83 @@
 package com.example.ecommerce.controller;
 
-import com.example.ecommerce.dto.ApiResponse;
-import com.example.ecommerce.dto.ProductRequest;
-import com.example.ecommerce.dto.ProductResponse;
-import com.example.ecommerce.service.ProductService;
-import jakarta.validation.Valid;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import java.util.List;
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+public class SecurityConfig {
 
-@RestController
-@RequestMapping("/api/v1/products")
-public class ProductController {
+    private final CustomUserDetailsService customUserDetailsService;
+    private final JwtAuthFilter jwtAuthFilter;
+    private final PasswordEncoder passwordEncoder;
 
-    private final ProductService productService;
-
-    public ProductController(ProductService productService) {
-        this.productService = productService;
+    public SecurityConfig(CustomUserDetailsService customUserDetailsService,
+                          JwtAuthFilter jwtAuthFilter,
+                          PasswordEncoder passwordEncoder) {
+        this.customUserDetailsService = customUserDetailsService;
+        this.jwtAuthFilter = jwtAuthFilter;
+        this.passwordEncoder = passwordEncoder;
     }
 
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductResponse>> addProduct(
-            @Valid @RequestBody ProductRequest request) {
-        ProductResponse saved = productService.addProduct(request);
-        return ResponseEntity.ok(ApiResponse.success("Product added successfully", saved));
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+                .csrf(csrf -> csrf.disable())
+                .authorizeHttpRequests(auth -> auth
+                        .requestMatchers(
+                                "/api/v1/auth/login",
+                                "/api/v1/auth/register",
+                                "/api/v1/auth/register-admin",
+                                "/api/v1/auth/refresh",
+                                "/api/v1/auth/logout",
+                                "/api/v1/products",
+                                "/api/v1/products/{id}",
+                                "/api/v1/categories",
+                                "/api/v1/products/*/reviews",
+                                "/api/v1/products/*/reviews/rating",
+                                "/api/v1/recommendations/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/swagger-resources/**",
+                                "/webjars/**"
+                        ).permitAll()
+                        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
+                        .anyRequest().authenticated()
+                )
+                .sessionManagement(sess -> sess
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                )
+                .authenticationProvider(authenticationProvider())
+                .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
     }
 
-    @GetMapping("/all")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAllProducts(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
-
-        Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ProductResponse> products = productService.searchProducts(
-                search, categoryId, minPrice, maxPrice, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Products fetched", products));
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(customUserDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        return provider;
     }
 
-    @GetMapping
-    public ResponseEntity<ApiResponse<Page<ProductResponse>>> getAvailableProducts(
-            @RequestParam(required = false) String search,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(defaultValue = "id") String sortBy,
-            @RequestParam(defaultValue = "asc") String sortDir) {
-
-        Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
-
-        Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ProductResponse> products = productService.searchAvailableProducts(
-                search, categoryId, minPrice, maxPrice, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Products fetched", products));
-    }
-
-    @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(
-                ApiResponse.success("Product fetched", productService.getProductById(id)));
-    }
-
-    @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @PathVariable Long id,
-            @Valid @RequestBody ProductRequest request) {
-        ProductResponse updated = productService.updateProduct(id, request);
-        return ResponseEntity.ok(ApiResponse.success("Product updated successfully", updated));
-    }
-
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @PathVariable Long id) {
-        productService.deleteProduct(id);
-        return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
-    }
-
-    @GetMapping("/low-stock")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts(
-            @RequestParam(defaultValue = "5") int threshold) {
-        List<ProductResponse> products = productService.getLowStockProducts(threshold);
-        return ResponseEntity.ok(ApiResponse.success("Low stock products fetched", products));
-    }
-
-    @GetMapping("/out-of-stock")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<List<ProductResponse>>> getOutOfStockProducts() {
-        List<ProductResponse> products = productService.getOutOfStockProducts();
-        return ResponseEntity.ok(ApiResponse.success("Out of stock products fetched", products));
-    }
-
-    @PatchMapping("/{id}/stock")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> updateStock(
-            @PathVariable Long id,
-            @RequestParam int quantity) {
-        productService.restoreStock(id, quantity);
-        return ResponseEntity.ok(ApiResponse.success("Stock updated successfully", null));
-    }
-
-    @PostMapping("/{id}/image")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductResponse>> uploadImage(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Image uploaded successfully",
-                productService.uploadProductImage(id, file)));
-    }
-
-    @DeleteMapping("/{id}/image")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductResponse>> deleteImage(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Image deleted successfully",
-                productService.deleteProductImage(id)));
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+            throws Exception {
+        return config.getAuthenticationManager();
     }
 }
