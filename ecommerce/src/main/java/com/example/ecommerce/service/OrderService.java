@@ -3,6 +3,8 @@ package com.example.ecommerce.service;
 import com.example.ecommerce.dto.OrderRequest;
 import com.example.ecommerce.dto.OrderResponse;
 import com.example.ecommerce.entity.*;
+import com.example.ecommerce.event.OrderCancelledEvent;
+import com.example.ecommerce.event.OrderPlacedEvent;
 import com.example.ecommerce.exception.ResourceNotFoundException;
 import com.example.ecommerce.repository.OrderRepository;
 import com.example.ecommerce.repository.ProductRepository;
@@ -24,7 +26,8 @@ public class OrderService {
     private final ProductService productService;
     private final CouponService couponService;
     private final EmailService emailService;
-    private final DemandTrackingService demandTrackingService;  // ← NEW
+    private final DemandTrackingService demandTrackingService;
+    private final EventPublisherService eventPublisherService;  // ← NEW
 
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
@@ -32,14 +35,16 @@ public class OrderService {
                         ProductService productService,
                         CouponService couponService,
                         EmailService emailService,
-                        DemandTrackingService demandTrackingService) {  // ← CHANGED
+                        DemandTrackingService demandTrackingService,
+                        EventPublisherService eventPublisherService) {  // ← NEW
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
         this.productService = productService;
         this.couponService = couponService;
         this.emailService = emailService;
-        this.demandTrackingService = demandTrackingService;  // ← NEW
+        this.demandTrackingService = demandTrackingService;
+        this.eventPublisherService = eventPublisherService;  // ← NEW
     }
 
     @Transactional
@@ -91,20 +96,42 @@ public class OrderService {
 
         Order saved = orderRepository.save(order);
 
-        // ─── NEW: Track PURCHASE events for demand-based pricing ───
+        // ─── Track demand events (direct) ─────────────────────
         for (OrderItem item : saved.getItems()) {
             try {
                 demandTrackingService.trackPurchase(
-                        item.getProduct().getId(),
-                        user.getId()
-                );
+                        item.getProduct().getId(), user.getId());
             } catch (Exception e) {
-                // Don't let tracking failure break order placement
                 System.err.println("Failed to track purchase event for product #"
                         + item.getProduct().getId() + ": " + e.getMessage());
             }
         }
-        // ─── END NEW ──────────────────────────────────────────────
+
+        // ─── NEW: Publish OrderPlacedEvent to RabbitMQ ────────
+        try {
+            OrderPlacedEvent event = new OrderPlacedEvent();
+            event.setOrderId(saved.getId());
+            event.setUserId(user.getId());
+            event.setUsername(user.getUsername());
+            event.setEmail(user.getEmail());
+            event.setTotalAmount(saved.getTotalAmount());
+            event.setFinalAmount(saved.getFinalAmount());
+            event.setCouponCode(saved.getCouponCode());
+
+            List<OrderPlacedEvent.OrderItemInfo> eventItems = saved.getItems().stream()
+                    .map(item -> new OrderPlacedEvent.OrderItemInfo(
+                            item.getProduct().getId(),
+                            item.getProduct().getName(),
+                            item.getQuantity(),
+                            item.getPrice()
+                    )).collect(Collectors.toList());
+            event.setItems(eventItems);
+
+            eventPublisherService.publishOrderPlaced(event);
+        } catch (Exception e) {
+            System.err.println("Failed to publish OrderPlacedEvent: " + e.getMessage());
+        }
+        // ─── END NEW ──────────────────────────────────────────
 
         if (user.getEmail() != null && !user.getEmail().isEmpty()) {
             try {
@@ -156,6 +183,30 @@ public class OrderService {
                         item.getProduct().getId(),
                         item.getQuantity());
             }
+
+            // ─── NEW: Publish OrderCancelledEvent ─────────────
+            try {
+                OrderCancelledEvent event = new OrderCancelledEvent();
+                event.setOrderId(orderId);
+                event.setUserId(order.getUser().getId());
+                event.setUsername(order.getUser().getUsername());
+                event.setEmail(order.getUser().getEmail());
+                event.setReason("Cancelled by admin");
+
+                List<OrderPlacedEvent.OrderItemInfo> eventItems = order.getItems().stream()
+                        .map(item -> new OrderPlacedEvent.OrderItemInfo(
+                                item.getProduct().getId(),
+                                item.getProduct().getName(),
+                                item.getQuantity(),
+                                item.getPrice()
+                        )).collect(Collectors.toList());
+                event.setItems(eventItems);
+
+                eventPublisherService.publishOrderCancelled(event);
+            } catch (Exception e) {
+                System.err.println("Failed to publish OrderCancelledEvent: " + e.getMessage());
+            }
+            // ─── END NEW ──────────────────────────────────────
         }
 
         order.setStatus(status.toUpperCase());
@@ -200,6 +251,30 @@ public class OrderService {
 
         order.setStatus("CANCELLED");
         Order saved = orderRepository.save(order);
+
+        // ─── NEW: Publish OrderCancelledEvent ─────────────────
+        try {
+            OrderCancelledEvent event = new OrderCancelledEvent();
+            event.setOrderId(orderId);
+            event.setUserId(user.getId());
+            event.setUsername(user.getUsername());
+            event.setEmail(user.getEmail());
+            event.setReason("Cancelled by customer");
+
+            List<OrderPlacedEvent.OrderItemInfo> eventItems = order.getItems().stream()
+                    .map(item -> new OrderPlacedEvent.OrderItemInfo(
+                            item.getProduct().getId(),
+                            item.getProduct().getName(),
+                            item.getQuantity(),
+                            item.getPrice()
+                    )).collect(Collectors.toList());
+            event.setItems(eventItems);
+
+            eventPublisherService.publishOrderCancelled(event);
+        } catch (Exception e) {
+            System.err.println("Failed to publish OrderCancelledEvent: " + e.getMessage());
+        }
+        // ─── END NEW ──────────────────────────────────────────
 
         if (user.getEmail() != null && !user.getEmail().isEmpty()) {
             try {

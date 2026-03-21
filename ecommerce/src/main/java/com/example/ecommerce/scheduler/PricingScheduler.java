@@ -1,4 +1,4 @@
-package scheduler;
+package com.example.ecommerce.scheduler;
 
 import com.example.ecommerce.service.DemandTrackingService;
 import com.example.ecommerce.service.DynamicPricingService;

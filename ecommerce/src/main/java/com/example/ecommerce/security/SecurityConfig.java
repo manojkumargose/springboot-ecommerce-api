@@ -48,6 +48,7 @@ public class SecurityConfig {
                                 "/api/v1/categories",
                                 "/api/v1/products/*/reviews",
                                 "/api/v1/products/*/reviews/rating",
+                                "/api/recommendations/**",
                                 "/api/v1/recommendations/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -57,12 +58,12 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
-                        // ─── NEW: Dynamic Pricing — public endpoints ─────
+                        // ─── Dynamic Pricing — public endpoints ─────
                         .requestMatchers(HttpMethod.POST, "/api/pricing/track").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/pricing/product/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/pricing/products").permitAll()
 
-                        // ─── NEW: Dynamic Pricing — admin-only endpoints ─
+                        // ─── Dynamic Pricing — admin-only endpoints ─
                         .requestMatchers("/api/pricing/rules/**").hasRole("ADMIN")
                         .requestMatchers("/api/pricing/recalculate").hasRole("ADMIN")
                         .requestMatchers("/api/pricing/analytics").hasRole("ADMIN")

@@ -1,8 +1,5 @@
 package com.example.ecommerce.controller;
 
-import com.example.ecommerce.dto.ApiResponse;
-import com.example.ecommerce.dto.ProductResponse;
-import com.example.ecommerce.entity.Product;
 import com.example.ecommerce.service.RecommendationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.stream.Collectors;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/recommendations")
@@ -23,61 +20,55 @@ public class RecommendationController {
         this.recommendationService = recommendationService;
     }
 
-    @GetMapping("/{productId}")
-    @Operation(summary = "Get AI recommendations for a product",
-            description = "Uses hybrid ML model: TF-IDF content similarity + collaborative filtering")
-    public ResponseEntity<ApiResponse> getRecommendations(
-            @PathVariable Long productId,
-            @RequestParam(defaultValue = "5") int limit) {
+    // POST /api/recommendations/product
+    // Body: { "productId": 1, "userId": 123, "topN": 5 }
+    @PostMapping("/product")
+    @Operation(summary = "Get recommendations for a product")
+    public ResponseEntity<List<Map<String, Object>>> recommendForProduct(
+            @RequestBody Map<String, Object> body) {
 
-        List<Product> recommendations = recommendationService.getRecommendations(productId, limit);
-        List<ProductResponse> response = recommendations.stream()
-                .map(this::toProductResponse)
-                .collect(Collectors.toList());
+        Long productId = Long.valueOf(body.get("productId").toString());
+        Long userId    = body.containsKey("userId") ? Long.valueOf(body.get("userId").toString()) : null;
+        int  topN      = body.containsKey("topN")   ? Integer.parseInt(body.get("topN").toString()) : 5;
 
-        return ResponseEntity.ok(new ApiResponse(true, "AI recommendations generated", response));
+        List<Map<String, Object>> recommendations =
+                recommendationService.getRecommendations(productId, userId, topN);
+
+        return ResponseEntity.ok(recommendations);
     }
 
-    @GetMapping("/{productId}/similar")
-    @Operation(summary = "Get similar products",
-            description = "Content-based filtering using TF-IDF and cosine similarity")
-    public ResponseEntity<ApiResponse> getSimilarProducts(
-            @PathVariable Long productId,
-            @RequestParam(defaultValue = "5") int limit) {
+    // GET /api/recommendations/user/{userId}?topN=5
+    @GetMapping("/user/{userId}")
+    @Operation(summary = "Get personalised recommendations for a user")
+    public ResponseEntity<List<Map<String, Object>>> recommendForUser(
+            @PathVariable Long userId,
+            @RequestParam(defaultValue = "5") int topN) {
 
-        List<Product> similar = recommendationService.getSimilarProducts(productId, limit);
-        List<ProductResponse> response = similar.stream()
-                .map(this::toProductResponse)
-                .collect(Collectors.toList());
+        List<Map<String, Object>> recommendations =
+                recommendationService.getRecommendationsForUser(userId, topN);
 
-        return ResponseEntity.ok(new ApiResponse(true, "Similar products found", response));
+        return ResponseEntity.ok(recommendations);
     }
 
-    @GetMapping("/{productId}/bought-together")
-    @Operation(summary = "Get frequently bought together products",
-            description = "Collaborative filtering based on co-purchase analysis")
-    public ResponseEntity<ApiResponse> getBoughtTogether(
-            @PathVariable Long productId,
-            @RequestParam(defaultValue = "5") int limit) {
+    // GET /api/recommendations/popular?topN=5
+    @GetMapping("/popular")
+    @Operation(summary = "Get popular products")
+    public ResponseEntity<List<Map<String, Object>>> popularProducts(
+            @RequestParam(defaultValue = "5") int topN) {
 
-        List<Product> boughtTogether = recommendationService.getBoughtTogether(productId, limit);
-        List<ProductResponse> response = boughtTogether.stream()
-                .map(this::toProductResponse)
-                .collect(Collectors.toList());
+        List<Map<String, Object>> recommendations =
+                recommendationService.getPopularProducts(topN);
 
-        return ResponseEntity.ok(new ApiResponse(true, "Frequently bought together", response));
+        return ResponseEntity.ok(recommendations);
     }
 
-    private ProductResponse toProductResponse(Product product) {
-        ProductResponse response = new ProductResponse();
-        response.setId(product.getId());
-        response.setName(product.getName());
-        response.setPrice(product.getPrice());
-        response.setDescription(product.getDescription());
-        response.setCategoryName(product.getCategory() != null ? product.getCategory().getName() : null);
-        response.setImageUrl(product.getImageUrl());
-        response.setInStock(product.getInStock());
-        response.setStockQuantity(product.getStockQuantity());
-        return response;
+    // GET /api/recommendations/health
+    @GetMapping("/health")
+    @Operation(summary = "Check ML service health")
+    public ResponseEntity<Map<String, Object>> health() {
+        boolean healthy = recommendationService.isMlServiceHealthy();
+        return ResponseEntity.ok(Map.of(
+                "mlServiceStatus", healthy ? "UP" : "DOWN"
+        ));
     }
 }
