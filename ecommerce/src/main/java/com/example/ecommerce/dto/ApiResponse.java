@@ -24,6 +24,10 @@ public class ApiResponse<T> {
         return new ApiResponse<>(false, message, null);
     }
 
+    public static <T> ApiResponse builder() {
+        return null;
+    }
+
     public boolean isSuccess() { return success; }
     public void setSuccess(boolean success) { this.success = success; }
 

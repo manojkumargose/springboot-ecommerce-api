@@ -3,6 +3,7 @@ package com.example.ecommerce.controller;
 import com.example.ecommerce.dto.ApiResponse;
 import com.example.ecommerce.entity.Cart;
 import com.example.ecommerce.service.CartService;
+import com.example.ecommerce.service.DemandTrackingService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -12,9 +13,12 @@ import org.springframework.web.bind.annotation.*;
 public class CartController {
 
     private final CartService cartService;
+    private final DemandTrackingService demandTrackingService;  // ← NEW
 
-    public CartController(CartService cartService) {
+    public CartController(CartService cartService,
+                          DemandTrackingService demandTrackingService) {  // ← CHANGED
         this.cartService = cartService;
+        this.demandTrackingService = demandTrackingService;  // ← NEW
     }
 
     // ─── Get My Cart ──────────────────────────────────────────
@@ -33,9 +37,19 @@ public class CartController {
     public ResponseEntity<ApiResponse<Cart>> addToCart(
             @RequestParam Long productId,
             @RequestParam int quantity) {
+
+        Cart cart = cartService.addToCart(productId, quantity);
+
+        // ─── NEW: Track cart-add event for demand-based pricing ───
+        try {
+            demandTrackingService.trackCartAdd(productId, null);
+        } catch (Exception e) {
+            // Don't let tracking failure break cart operation
+        }
+        // ─── END NEW ─────────────────────────────────────────────
+
         return ResponseEntity.ok(
-                ApiResponse.success("Item added to cart",
-                        cartService.addToCart(productId, quantity)));
+                ApiResponse.success("Item added to cart", cart));
     }
 
     // ─── Remove Item from Cart ────────────────────────────────

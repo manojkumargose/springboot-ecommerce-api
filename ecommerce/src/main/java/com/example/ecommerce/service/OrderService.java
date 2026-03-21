@@ -24,19 +24,22 @@ public class OrderService {
     private final ProductService productService;
     private final CouponService couponService;
     private final EmailService emailService;
+    private final DemandTrackingService demandTrackingService;  // ← NEW
 
     public OrderService(OrderRepository orderRepository,
                         ProductRepository productRepository,
                         UserRepository userRepository,
                         ProductService productService,
                         CouponService couponService,
-                        EmailService emailService) {
+                        EmailService emailService,
+                        DemandTrackingService demandTrackingService) {  // ← CHANGED
         this.orderRepository = orderRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
         this.productService = productService;
         this.couponService = couponService;
         this.emailService = emailService;
+        this.demandTrackingService = demandTrackingService;  // ← NEW
     }
 
     @Transactional
@@ -87,6 +90,21 @@ public class OrderService {
         }
 
         Order saved = orderRepository.save(order);
+
+        // ─── NEW: Track PURCHASE events for demand-based pricing ───
+        for (OrderItem item : saved.getItems()) {
+            try {
+                demandTrackingService.trackPurchase(
+                        item.getProduct().getId(),
+                        user.getId()
+                );
+            } catch (Exception e) {
+                // Don't let tracking failure break order placement
+                System.err.println("Failed to track purchase event for product #"
+                        + item.getProduct().getId() + ": " + e.getMessage());
+            }
+        }
+        // ─── END NEW ──────────────────────────────────────────────
 
         if (user.getEmail() != null && !user.getEmail().isEmpty()) {
             try {

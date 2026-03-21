@@ -17,6 +17,26 @@ services:
       timeout: 20s
       retries: 10
 
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: ecommerce-rabbitmq
+    ports:
+      - "5672:5672"   # Main communication port for Spring Boot/Python
+      - "15672:15672" # Dashboard UI port for you to monitor
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin123
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+
+  redis:
+    image: redis:alpine
+    container_name: ecommerce-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
   app:
     build: .
     container_name: ecommerce-app
@@ -32,9 +52,22 @@ services:
       CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
       CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
       CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      # Kotha Connections (Docker internal networking)
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: admin
+      SPRING_RABBITMQ_PASSWORD: admin123
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
     depends_on:
       mysql:
         condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      redis:
+        condition: service_started
 
 volumes:
   mysql_data:
+  rabbitmq_data:
+  redis_data:

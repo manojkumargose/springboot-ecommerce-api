@@ -2,6 +2,7 @@ package com.example.ecommerce.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -43,7 +44,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/auth/logout",
                                 "/api/v1/products",
-                                "/api/v1/products/{id}",
+                                "/api/v1/products/**",
                                 "/api/v1/categories",
                                 "/api/v1/products/*/reviews",
                                 "/api/v1/products/*/reviews/rating",
@@ -55,6 +56,17 @@ public class SecurityConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
+
+                        // ─── NEW: Dynamic Pricing — public endpoints ─────
+                        .requestMatchers(HttpMethod.POST, "/api/pricing/track").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/pricing/product/**").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/pricing/products").permitAll()
+
+                        // ─── NEW: Dynamic Pricing — admin-only endpoints ─
+                        .requestMatchers("/api/pricing/rules/**").hasRole("ADMIN")
+                        .requestMatchers("/api/pricing/recalculate").hasRole("ADMIN")
+                        .requestMatchers("/api/pricing/analytics").hasRole("ADMIN")
+
                         .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
