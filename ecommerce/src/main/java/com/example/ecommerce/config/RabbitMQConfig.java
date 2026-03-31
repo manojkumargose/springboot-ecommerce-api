@@ -9,77 +9,76 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * RabbitMQ configuration — defines exchange, queues, and routing.
- *
- * Architecture:
- *   Producer → TopicExchange → routing key → Queue → Consumer
- *
- * Exchange: ecommerce.exchange (topic type)
- *
- * Routing keys:
- *   order.placed       → order queue, email queue, demand queue
- *   order.cancelled    → order queue, email queue
- *   payment.completed  → payment queue, email queue
- *
- * 📁 Location: com.example.ecommerce.config
- * 📝 Action:   CREATE NEW FILE (or replace existing RabbitMQ config)
+ * Updated RabbitMQ configuration — includes the AI Pricing Feedback Loop.
  */
 @Configuration
 public class RabbitMQConfig {
 
-    // ─── Exchange ────────────────────────────────────────────
-
+    // ─── Existing E-commerce Exchange ────────────────────────
     public static final String EXCHANGE = "ecommerce.exchange";
 
-    // ─── Queue Names ─────────────────────────────────────────
+    // ─── 🚀 NEW: AI Pricing Exchange ──────────────────────────
+    // These must match exactly with what we set in the AI Service
+    public static final String PRICE_UPDATE_QUEUE = "price.update.queue";
+    public static final String PRICE_UPDATE_EXCHANGE = "price.update.exchange";
+    public static final String PRICE_UPDATE_ROUTING_KEY = "price.update.routingKey";
 
+    // ─── Existing Queue Names ─────────────────────────────────
     public static final String ORDER_QUEUE = "ecommerce.order.queue";
     public static final String EMAIL_QUEUE = "ecommerce.email.queue";
     public static final String PAYMENT_QUEUE = "ecommerce.payment.queue";
     public static final String DEMAND_QUEUE = "ecommerce.demand.queue";
     public static final String INVOICE_QUEUE = "ecommerce.invoice.queue";
 
-    // ─── Routing Keys ────────────────────────────────────────
-
+    // ─── Existing Routing Keys ────────────────────────────────
     public static final String ORDER_PLACED_KEY = "order.placed";
     public static final String ORDER_CANCELLED_KEY = "order.cancelled";
     public static final String PAYMENT_COMPLETED_KEY = "payment.completed";
 
-    // ─── Exchange Bean ───────────────────────────────────────
+    // ─── Exchange Beans ───────────────────────────────────────
 
     @Bean
     public TopicExchange ecommerceExchange() {
         return new TopicExchange(EXCHANGE);
     }
 
+    @Bean
+    public TopicExchange priceExchange() {
+        return new TopicExchange(PRICE_UPDATE_EXCHANGE);
+    }
+
     // ─── Queue Beans ─────────────────────────────────────────
 
     @Bean
-    public Queue orderQueue() {
-        return QueueBuilder.durable(ORDER_QUEUE).build();
+    public Queue priceUpdateQueue() {
+        return QueueBuilder.durable(PRICE_UPDATE_QUEUE).build();
     }
 
     @Bean
-    public Queue emailQueue() {
-        return QueueBuilder.durable(EMAIL_QUEUE).build();
-    }
+    public Queue orderQueue() { return QueueBuilder.durable(ORDER_QUEUE).build(); }
 
     @Bean
-    public Queue paymentQueue() {
-        return QueueBuilder.durable(PAYMENT_QUEUE).build();
-    }
+    public Queue emailQueue() { return QueueBuilder.durable(EMAIL_QUEUE).build(); }
 
     @Bean
-    public Queue demandQueue() {
-        return QueueBuilder.durable(DEMAND_QUEUE).build();
-    }
+    public Queue paymentQueue() { return QueueBuilder.durable(PAYMENT_QUEUE).build(); }
 
     @Bean
-    public Queue invoiceQueue() {
-        return QueueBuilder.durable(INVOICE_QUEUE).build();
+    public Queue demandQueue() { return QueueBuilder.durable(DEMAND_QUEUE).build(); }
+
+    @Bean
+    public Queue invoiceQueue() { return QueueBuilder.durable(INVOICE_QUEUE).build(); }
+
+    // ─── 🚀 NEW: AI Pricing Binding ──────────────────────────
+
+    @Bean
+    public Binding priceUpdateBinding() {
+        return BindingBuilder.bind(priceUpdateQueue())
+                .to(priceExchange())
+                .with(PRICE_UPDATE_ROUTING_KEY);
     }
 
-    // ─── Bindings: order.placed → multiple queues ────────────
+    // ─── Existing Bindings ───────────────────────────────────
 
     @Bean
     public Binding orderPlacedToOrderQueue() {
@@ -101,8 +100,6 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(invoiceQueue()).to(ecommerceExchange()).with(ORDER_PLACED_KEY);
     }
 
-    // ─── Bindings: order.cancelled → queues ──────────────────
-
     @Bean
     public Binding orderCancelledToOrderQueue() {
         return BindingBuilder.bind(orderQueue()).to(ecommerceExchange()).with(ORDER_CANCELLED_KEY);
@@ -112,8 +109,6 @@ public class RabbitMQConfig {
     public Binding orderCancelledToEmailQueue() {
         return BindingBuilder.bind(emailQueue()).to(ecommerceExchange()).with(ORDER_CANCELLED_KEY);
     }
-
-    // ─── Bindings: payment.completed → queues ────────────────
 
     @Bean
     public Binding paymentCompletedToPaymentQueue() {
@@ -130,7 +125,7 @@ public class RabbitMQConfig {
         return BindingBuilder.bind(invoiceQueue()).to(ecommerceExchange()).with(PAYMENT_COMPLETED_KEY);
     }
 
-    // ─── JSON Message Converter (events sent as JSON) ────────
+    // ─── Infrastructure ──────────────────────────────────────
 
     @Bean
     public MessageConverter jsonMessageConverter() {
