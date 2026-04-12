@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ecommerce-ingress
+  namespace: ecommerce
+  annotations:
+    # NGINX configuration
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    # Limit to 100 requests per minute per IP address
+    nginx.ingress.kubernetes.io/limit-rpm: "100"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.yourdomain.com         # Replace with your actual domain
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: api-gateway
+                port:
+                  number: 80           # Correctly points to the Service port
+  tls:
+    - hosts:
+        - api.yourdomain.com
+      secretName: ecommerce-tls-secret

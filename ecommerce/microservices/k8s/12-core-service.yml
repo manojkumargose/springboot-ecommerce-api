@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: core-service
+  namespace: ecommerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: core-service
+  template:
+    metadata:
+      labels:
+        app: core-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "8082"
+    spec:
+      containers:
+        - name: core-service
+          image: core-service:v5
+          ports:
+            - containerPort: 8082
+          env:
+            - name: MANAGEMENT_METRICS_TAGS_APPLICATION
+              value: "core-service"
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+
+            # --- DATABASE CONFIG ---
+            - name: SPRING_DATASOURCE_URL
+              value: "jdbc:mysql://core-db:3306/core_db?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC"
+            - name: SPRING_DATASOURCE_USERNAME
+              value: "root"
+            # --- THE ULTIMATE FIX: LINK TO SECRET ---
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: MYSQL_ROOT_PASSWORD # Pulls 'root123' automatically
+
+            # --- EUREKA CONFIG ---
+            - name: EUREKA_CLIENT_SERVICEURL_DEFAULTZONE
+              value: "http://eureka-server:8761/eureka/"
+
+            # --- RABBITMQ CONFIG ---
+            - name: SPRING_RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: SPRING_RABBITMQ_PORT
+              value: "5672"
+
+            # --- OBSERVABILITY & TRACING ---
+            - name: MANAGEMENT_ZIPKIN_TRACING_ENDPOINT
+              value: "http://zipkin:9411/api/v2/spans"
+            - name: MANAGEMENT_TRACING_SAMPLING_PROBABILITY
+              value: "1.0"
+
+            # --- JWT CONFIG ---
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: JWT_SECRET
+            - name: JWT_EXPIRATION
+              value: "86400000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: core-service
+  namespace: ecommerce
+spec:
+  selector:
+    app: core-service
+  ports:
+    - port: 8082
+      targetPort: 8082

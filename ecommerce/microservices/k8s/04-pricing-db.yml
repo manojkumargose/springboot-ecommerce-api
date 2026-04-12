@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pricing-db
+  namespace: ecommerce
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pricing-db
+  template:
+    metadata:
+      labels:
+        app: pricing-db
+    spec:
+      containers:
+        - name: pricing-db
+          image: mysql:8.0
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ecommerce-secrets
+                  key: DB_PASSWORD
+            - name: MYSQL_DATABASE
+              value: "pricing_db"
+          ports:
+            - containerPort: 3306
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "mysqladmin ping -h localhost -uroot -p$$MYSQL_ROOT_PASSWORD"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: pricing-db-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: pricing-db-storage
+          persistentVolumeClaim:
+            claimName: pricing-db-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pricing-db-pvc
+  namespace: ecommerce
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pricing-db
+  namespace: ecommerce
+spec:
+  selector:
+    app: pricing-db
+  ports:
+    - port: 3306
+      targetPort: 3306
