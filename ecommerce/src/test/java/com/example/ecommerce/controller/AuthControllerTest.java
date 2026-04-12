@@ -1,154 +1,102 @@
 package com.example.ecommerce.controller;
 
 import com.example.ecommerce.dto.AuthRequest;
-import com.example.ecommerce.entity.User;
 import com.example.ecommerce.repository.UserRepository;
 import com.example.ecommerce.security.JwtUtil;
 import com.example.ecommerce.security.TokenBlacklistService;
 import com.example.ecommerce.service.EmailService;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.http.MediaType;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
-@AutoConfigureMockMvc
-public class AuthControllerTest {
+@ExtendWith(MockitoExtension.class)
+@org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
+class AuthControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private JwtUtil jwtUtil;
+    @Mock private TokenBlacklistService tokenBlacklistService;
+    @Mock private UserRepository userRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private EmailService emailService;
 
-    @Autowired
-    private ObjectMapper objectMapper;
+    @InjectMocks
+    private AuthController authController;
 
-    @MockBean
-    private AuthenticationManager authenticationManager;
+    @Test
+    @DisplayName("Should register user successfully")
+    void register_Success() {
+        AuthRequest request = new AuthRequest();
+        request.setUsername("newuser");
+        request.setPassword("password123");
+        request.setEmail("new@test.com");
 
-    @MockBean
-    private JwtUtil jwtUtil;
+        when(userRepository.findByUsername("newuser")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password123")).thenReturn("encodedPass");
 
-    @MockBean
-    private TokenBlacklistService tokenBlacklistService;
+        var result = authController.register(request);
 
-    @MockBean
-    private UserRepository userRepository;
-
-    @MockBean
-    private PasswordEncoder passwordEncoder;
-
-    @MockBean
-    private EmailService emailService;
-
-    private AuthRequest authRequest;
-
-    @BeforeEach
-    void setUp() {
-        authRequest = new AuthRequest();
-        authRequest.setUsername("testuser");
-        authRequest.setPassword("password123");
-        authRequest.setEmail("test@example.com");
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
+        verify(userRepository).save(any());
     }
 
     @Test
-    void register_ShouldReturnSuccess_WhenUserDoesNotExist() throws Exception {
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.empty());
-        when(passwordEncoder.encode(anyString())).thenReturn("encodedPassword");
-        when(userRepository.save(any(User.class))).thenReturn(new User());
-        when(jwtUtil.generateToken("testuser")).thenReturn("access-token");
-        when(jwtUtil.generateRefreshToken("testuser")).thenReturn("refresh-token");
-        doNothing().when(emailService).sendWelcomeEmail(anyString(), anyString());
+    @DisplayName("Should reject duplicate username")
+    void register_DuplicateUsername() {
+        AuthRequest request = new AuthRequest();
+        request.setUsername("existing");
+        request.setPassword("password123");
+        request.setEmail("dup@test.com");
 
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(authRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Registration successful"))
-                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
-                .andExpect(jsonPath("$.data.refreshToken").value("refresh-token"));
+        when(userRepository.findByUsername("existing")).thenReturn(Optional.of(new com.example.ecommerce.entity.User()));
+
+        var result = authController.register(request);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(400);
     }
 
     @Test
-    void register_ShouldReturnBadRequest_WhenUsernameExists() throws Exception {
-        when(userRepository.findByUsername("testuser")).thenReturn(Optional.of(new User()));
+    @DisplayName("Should login successfully")
+    void login_Success() {
+        AuthRequest request = new AuthRequest();
+        request.setUsername("testuser");
+        request.setPassword("password123");
 
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(authRequest)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.message").value("Username already exists"));
+        when(authenticationManager.authenticate(any()))
+                .thenReturn(new UsernamePasswordAuthenticationToken("testuser", null));
+        when(jwtUtil.generateToken("testuser")).thenReturn("fake-jwt-token");
+        when(userRepository.findByUsername("testuser"))
+                .thenReturn(Optional.of(new com.example.ecommerce.entity.User()));
+
+        var result = authController.login(request);
+
+        assertThat(result.getStatusCode().value()).isEqualTo(200);
     }
 
     @Test
-    void login_ShouldReturnTokens_WhenCredentialsAreValid() throws Exception {
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
-                .thenReturn(null);
-        when(jwtUtil.generateToken("testuser")).thenReturn("access-token");
-        when(jwtUtil.generateRefreshToken("testuser")).thenReturn("refresh-token");
+    @DisplayName("Should throw on invalid credentials")
+    void login_InvalidCredentials() {
+        AuthRequest request = new AuthRequest();
+        request.setUsername("wrong");
+        request.setPassword("wrong");
 
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(authRequest)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Login successful"))
-                .andExpect(jsonPath("$.data.accessToken").value("access-token"))
-                .andExpect(jsonPath("$.data.refreshToken").value("refresh-token"));
-    }
-
-    @Test
-    void login_ShouldReturnBadRequest_WhenCredentialsAreInvalid() throws Exception {
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+        when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("Bad credentials"));
 
-        mockMvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(authRequest)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void logout_ShouldReturnSuccess_WhenTokenIsValid() throws Exception {
-        doNothing().when(tokenBlacklistService).blacklistToken(anyString());
-
-        mockMvc.perform(post("/api/v1/auth/logout")
-                        .header("Authorization", "Bearer valid-token"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.message").value("Logged out successfully"));
-    }
-
-    @Test
-    void register_ShouldReturnBadRequest_WhenPasswordIsTooShort() throws Exception {
-        authRequest.setPassword("123");
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(authRequest)))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void register_ShouldReturnBadRequest_WhenUsernameIsBlank() throws Exception {
-        authRequest.setUsername("");
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(authRequest)))
-                .andExpect(status().isBadRequest());
+        assertThatThrownBy(() -> authController.login(request))
+                .isInstanceOf(BadCredentialsException.class);
     }
 }

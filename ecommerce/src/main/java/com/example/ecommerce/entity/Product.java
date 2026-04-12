@@ -40,6 +40,8 @@ public class Product {
 
     private String imagePublicId;
 
+    private Integer initialStock;
+
     // ─── Dynamic Pricing Fields ──────────────────────────────
 
     private Double basePrice;
@@ -129,4 +131,6 @@ public class Product {
         this.stockQuantity = stockQuantity;
         this.inStock = stockQuantity > 0;
     }
+    public Integer getInitialStock() { return initialStock; }
+    public void setInitialStock(Integer initialStock) { this.initialStock = initialStock; }
 }

@@ -12,6 +12,10 @@ public class ProductResponse {
     private Double averageRating;
     private Long reviewCount;
     private String imageUrl;
+    private Double basePrice;
+    private Double priceChangePercent;
+    private String demandLevel;
+    private Integer demandScore;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -42,4 +46,16 @@ public class ProductResponse {
 
     public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public Double getBasePrice() { return basePrice; }
+    public void setBasePrice(Double basePrice) { this.basePrice = basePrice; }
+
+    public Double getPriceChangePercent() { return priceChangePercent; }
+    public void setPriceChangePercent(Double priceChangePercent) { this.priceChangePercent = priceChangePercent; }
+
+    public String getDemandLevel() { return demandLevel; }
+    public void setDemandLevel(String demandLevel) { this.demandLevel = demandLevel; }
+
+    public Integer getDemandScore() { return demandScore; }
+    public void setDemandScore(Integer demandScore) { this.demandScore = demandScore; }
 }

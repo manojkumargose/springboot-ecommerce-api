@@ -12,7 +12,7 @@ public class Cart {
 
     private Long userId;
 
-    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "cart", cascade = CascadeType.ALL, fetch = FetchType.EAGER, orphanRemoval = true)
     private List<CartItem> items;
 
     public Long getId() {

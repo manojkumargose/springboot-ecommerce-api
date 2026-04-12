@@ -41,4 +41,10 @@ public class OrderCancelledEvent implements Serializable {
     public void setReason(String reason) { this.reason = reason; }
     public LocalDateTime getTimestamp() { return timestamp; }
     public void setTimestamp(LocalDateTime timestamp) { this.timestamp = timestamp; }
+
+    public class OrderItemInfo {
+        public Long getProductId() {
+            return 0L;
+        }
+    }
 }

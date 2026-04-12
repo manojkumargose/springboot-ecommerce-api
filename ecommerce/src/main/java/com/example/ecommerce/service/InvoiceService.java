@@ -30,37 +30,32 @@ public class InvoiceService {
             PdfWriter.getInstance(document, out);
             document.open();
 
-            // ── Fonts ─────────────────────────────────────────
             Font titleFont = new Font(Font.FontFamily.HELVETICA, 24, Font.BOLD);
             Font headerFont = new Font(Font.FontFamily.HELVETICA, 12, Font.BOLD);
             Font normalFont = new Font(Font.FontFamily.HELVETICA, 11, Font.NORMAL);
             Font smallFont = new Font(Font.FontFamily.HELVETICA, 10, Font.NORMAL);
 
-            // ── Title ─────────────────────────────────────────
             Paragraph title = new Paragraph("INVOICE", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
             document.add(Chunk.NEWLINE);
 
-            // ── Store Info ────────────────────────────────────
-            Paragraph storeName = new Paragraph("My Ecommerce Store", headerFont);
+            Paragraph storeName = new Paragraph("ShopAI Store", headerFont);
             storeName.setAlignment(Element.ALIGN_CENTER);
             document.add(storeName);
 
             Paragraph storeEmail = new Paragraph(
-                    "Email: store@ecommerce.com | Phone: +91 9876543210", smallFont);
+                    "Email: store@shopai.com | Phone: +91 9876543210", smallFont);
             storeEmail.setAlignment(Element.ALIGN_CENTER);
             document.add(storeEmail);
             document.add(Chunk.NEWLINE);
 
-            // ── Divider ───────────────────────────────────────
             Paragraph divider = new Paragraph(
-                    "------------------------------------------------", normalFont);
+                    "────────────────────────────────────────────────", normalFont);
             divider.setAlignment(Element.ALIGN_CENTER);
             document.add(divider);
             document.add(Chunk.NEWLINE);
 
-            // ── Order Info ────────────────────────────────────
             PdfPTable orderInfoTable = new PdfPTable(2);
             orderInfoTable.setWidthPercentage(100);
 
@@ -76,55 +71,50 @@ public class InvoiceService {
             document.add(orderInfoTable);
             document.add(Chunk.NEWLINE);
 
-            // ── Items Table ───────────────────────────────────
             PdfPTable itemsTable = new PdfPTable(4);
             itemsTable.setWidthPercentage(100);
             itemsTable.setWidths(new float[]{4f, 1f, 2f, 2f});
 
-            // Table headers
             addTableHeader(itemsTable, "Product", headerFont);
             addTableHeader(itemsTable, "Qty", headerFont);
             addTableHeader(itemsTable, "Unit Price", headerFont);
             addTableHeader(itemsTable, "Total", headerFont);
 
-            // Table rows
             for (OrderItem item : order.getItems()) {
                 itemsTable.addCell(new Phrase(
                         item.getProduct().getName(), normalFont));
                 itemsTable.addCell(new Phrase(
                         String.valueOf(item.getQuantity()), normalFont));
                 itemsTable.addCell(new Phrase(
-                        "Rs. " + item.getPrice(), normalFont));
+                        "Rs. " + String.format("%.2f", item.getPrice()), normalFont));
                 itemsTable.addCell(new Phrase(
-                        "Rs. " + (item.getPrice() * item.getQuantity()), normalFont));
+                        "Rs. " + String.format("%.2f", item.getPrice() * item.getQuantity()), normalFont));
             }
 
             document.add(itemsTable);
             document.add(Chunk.NEWLINE);
 
-            // ── Summary Table ─────────────────────────────────
             PdfPTable summaryTable = new PdfPTable(2);
             summaryTable.setWidthPercentage(40);
             summaryTable.setHorizontalAlignment(Element.ALIGN_RIGHT);
 
             addSummaryRow(summaryTable,
-                    "Subtotal:", "Rs. " + order.getTotalAmount(), normalFont);
+                    "Subtotal:", "Rs. " + String.format("%.2f", order.getTotalAmount()), normalFont);
 
-            if (order.getCouponCode() != null) {
+            if (order.getCouponCode() != null && order.getDiscountAmount() != null && order.getDiscountAmount() > 0) {
                 addSummaryRow(summaryTable,
                         "Coupon (" + order.getCouponCode() + "):",
-                        "- Rs. " + order.getDiscountAmount(), normalFont);
+                        "- Rs. " + String.format("%.2f", order.getDiscountAmount()), normalFont);
             }
 
             addSummaryRow(summaryTable,
-                    "Total:", "Rs. " + order.getFinalAmount(), headerFont);
+                    "Total:", "Rs. " + String.format("%.2f", order.getFinalAmount()), headerFont);
 
             document.add(summaryTable);
             document.add(Chunk.NEWLINE);
 
-            // ── Footer ────────────────────────────────────────
             Paragraph divider2 = new Paragraph(
-                    "------------------------------------------------", normalFont);
+                    "────────────────────────────────────────────────", normalFont);
             divider2.setAlignment(Element.ALIGN_CENTER);
             document.add(divider2);
             document.add(Chunk.NEWLINE);
@@ -146,8 +136,6 @@ public class InvoiceService {
             throw new RuntimeException("Failed to generate invoice: " + e.getMessage());
         }
     }
-
-    // ─── Helper Methods ───────────────────────────────────────
 
     private void addTableHeader(PdfPTable table, String text, Font font) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));

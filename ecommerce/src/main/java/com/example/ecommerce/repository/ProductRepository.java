@@ -8,10 +8,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    @Query("SELECT p FROM Product p WHERE " +
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category")
+    List<Product> findAllWithCategory();
+
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.id = :id")
+    Optional<Product> findByIdWithCategory(@Param("id") Long id);
+
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE " +
             "(:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
             "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
             "(:minPrice IS NULL OR p.price >= :minPrice) AND " +
@@ -23,7 +30,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
             @Param("maxPrice") Double maxPrice,
             Pageable pageable);
 
-    @Query("SELECT p FROM Product p WHERE " +
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE " +
             "p.inStock = true AND " +
             "(:search IS NULL OR LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
             "(:categoryId IS NULL OR p.category.id = :categoryId) AND " +
@@ -40,4 +47,7 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
 
     @Query("SELECT p FROM Product p WHERE p.stockQuantity <= :threshold ORDER BY p.stockQuantity ASC")
     List<Product> findLowStockProducts(@Param("threshold") int threshold);
+
+    @Query("SELECT p FROM Product p LEFT JOIN FETCH p.category WHERE p.category.id = :categoryId AND p.id != :productId")
+    List<Product> findByCategoryIdAndIdNot(@Param("categoryId") Long categoryId, @Param("productId") Long productId);
 }

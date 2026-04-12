@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -87,9 +88,10 @@ public class DemandTrackingService {
 
     /**
      * Get weighted demand scores for ALL products in one efficient query.
+     * ✅ FIX: Uses UTC to match Aiven Cloud database timezone
      */
     public Map<Long, Long> getWeightedDemandScores(int windowHours) {
-        LocalDateTime since = LocalDateTime.now().minusHours(windowHours);
+        LocalDateTime since = LocalDateTime.now(ZoneOffset.UTC).minusHours(windowHours);  // ✅ FIX
         List<Object[]> results = demandEventRepository.getWeightedDemandScores(since);
 
         return results.stream().collect(Collectors.toMap(
@@ -100,27 +102,30 @@ public class DemandTrackingService {
 
     /**
      * Get raw event count for a single product.
+     * ✅ FIX: Uses UTC to match Aiven Cloud database timezone
      */
     public Long getEventCount(Long productId, int windowHours) {
-        LocalDateTime since = LocalDateTime.now().minusHours(windowHours);
+        LocalDateTime since = LocalDateTime.now(ZoneOffset.UTC).minusHours(windowHours);  // ✅ FIX
         return demandEventRepository.countByProductIdAndCreatedAtAfter(productId, since);
     }
 
     /**
      * Get top trending products by event count.
+     * ✅ FIX: Uses UTC to match Aiven Cloud database timezone
      */
     public List<Object[]> getTopTrending(int windowHours, int limit) {
-        LocalDateTime since = LocalDateTime.now().minusHours(windowHours);
+        LocalDateTime since = LocalDateTime.now(ZoneOffset.UTC).minusHours(windowHours);  // ✅ FIX
         List<Object[]> all = demandEventRepository.getTopTrendingProducts(since);
         return all.stream().limit(limit).collect(Collectors.toList());
     }
 
     /**
      * Delete events older than retentionDays.
+     * ✅ FIX: Uses UTC to match Aiven Cloud database timezone
      */
     @Transactional
     public void cleanupOldEvents(int retentionDays) {
-        LocalDateTime cutoff = LocalDateTime.now().minusDays(retentionDays);
+        LocalDateTime cutoff = LocalDateTime.now(ZoneOffset.UTC).minusDays(retentionDays);  // ✅ FIX
         demandEventRepository.deleteByCreatedAtBefore(cutoff);
         log.info("Cleaned up demand events older than {} days", retentionDays);
     }

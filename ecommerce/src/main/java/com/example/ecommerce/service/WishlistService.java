@@ -17,13 +17,16 @@ public class WishlistService {
     private final WishlistRepository wishlistRepository;
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
+    private final EventPublisherService eventPublisherService; // NEW
 
     public WishlistService(WishlistRepository wishlistRepository,
                            ProductRepository productRepository,
-                           UserRepository userRepository) {
+                           UserRepository userRepository,
+                           EventPublisherService eventPublisherService) { // NEW
         this.wishlistRepository = wishlistRepository;
         this.productRepository = productRepository;
         this.userRepository = userRepository;
+        this.eventPublisherService = eventPublisherService; // NEW
     }
 
     private User getCurrentUser() {
@@ -43,7 +46,14 @@ public class WishlistService {
         Wishlist wishlist = new Wishlist();
         wishlist.setUser(user);
         wishlist.setProduct(product);
-        return wishlistRepository.save(wishlist);
+        Wishlist saved = wishlistRepository.save(wishlist);
+
+        // NEW: Track wishlist demand for AI pricing
+        try {
+            eventPublisherService.publishWishlistAdd(productId, user.getId());
+        } catch (Exception ignored) {}
+
+        return saved;
     }
 
     public void removeFromWishlist(Long productId) {

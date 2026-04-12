@@ -3,7 +3,10 @@ package com.example.ecommerce.controller;
 import com.example.ecommerce.dto.ApiResponse;
 import com.example.ecommerce.dto.ProductRequest;
 import com.example.ecommerce.dto.ProductResponse;
+import com.example.ecommerce.entity.User;
+import com.example.ecommerce.repository.UserRepository;
 import com.example.ecommerce.service.DemandTrackingService;
+import com.example.ecommerce.service.EventPublisherService;
 import com.example.ecommerce.service.ProductService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
@@ -12,6 +15,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -22,20 +27,26 @@ import java.util.List;
 public class ProductController {
 
     private final ProductService productService;
-    private final DemandTrackingService demandTrackingService;  // ← NEW
+    private final DemandTrackingService demandTrackingService;
+    private final EventPublisherService eventPublisherService;
+    private final UserRepository userRepository;
 
     public ProductController(ProductService productService,
-                             DemandTrackingService demandTrackingService) {  // ← CHANGED
+                             DemandTrackingService demandTrackingService,
+                             EventPublisherService eventPublisherService,
+                             UserRepository userRepository) {
         this.productService = productService;
-        this.demandTrackingService = demandTrackingService;  // ← NEW
+        this.demandTrackingService = demandTrackingService;
+        this.eventPublisherService = eventPublisherService;
+        this.userRepository = userRepository;
     }
 
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> addProduct(
             @Valid @RequestBody ProductRequest request) {
-        ProductResponse saved = productService.addProduct(request);
-        return ResponseEntity.ok(ApiResponse.success("Product added successfully", saved));
+        return ResponseEntity.ok(ApiResponse.success("Product added successfully",
+                productService.addProduct(request)));
     }
 
     @GetMapping("/all")
@@ -49,15 +60,11 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
-
         Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
-
+                ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ProductResponse> products = productService.searchProducts(
-                search, categoryId, minPrice, maxPrice, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Products fetched", products));
+        return ResponseEntity.ok(ApiResponse.success("Products fetched",
+                productService.searchProducts(search, categoryId, minPrice, maxPrice, pageable)));
     }
 
     @GetMapping
@@ -70,28 +77,20 @@ public class ProductController {
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sortBy,
             @RequestParam(defaultValue = "asc") String sortDir) {
-
         Sort sort = sortDir.equalsIgnoreCase("desc")
-                ? Sort.by(sortBy).descending()
-                : Sort.by(sortBy).ascending();
-
+                ? Sort.by(sortBy).descending() : Sort.by(sortBy).ascending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<ProductResponse> products = productService.searchAvailableProducts(
-                search, categoryId, minPrice, maxPrice, pageable);
-        return ResponseEntity.ok(ApiResponse.success("Products fetched", products));
+        return ResponseEntity.ok(ApiResponse.success("Products fetched",
+                productService.searchAvailableProducts(search, categoryId, minPrice, maxPrice, pageable)));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<ProductResponse>> getProduct(
-            @PathVariable Long id) {
+    public ResponseEntity<ApiResponse<ProductResponse>> getProduct(@PathVariable Long id) {
 
-        // ─── NEW: Track product view for demand-based pricing ───
+        // Track locally only (no AI price change on views)
         try {
             demandTrackingService.trackProductView(id, null);
-        } catch (Exception e) {
-            // Don't let tracking failure break product fetch
-        }
-        // ─── END NEW ────────────────────────────────────────────
+        } catch (Exception ignored) {}
 
         return ResponseEntity.ok(
                 ApiResponse.success("Product fetched", productService.getProductById(id)));
@@ -100,16 +99,14 @@ public class ProductController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> updateProduct(
-            @PathVariable Long id,
-            @Valid @RequestBody ProductRequest request) {
-        ProductResponse updated = productService.updateProduct(id, request);
-        return ResponseEntity.ok(ApiResponse.success("Product updated successfully", updated));
+            @PathVariable Long id, @Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Product updated successfully",
+                productService.updateProduct(id, request)));
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<Void>> deleteProduct(
-            @PathVariable Long id) {
+    public ResponseEntity<ApiResponse<Void>> deleteProduct(@PathVariable Long id) {
         productService.deleteProduct(id);
         return ResponseEntity.ok(ApiResponse.success("Product deleted successfully", null));
     }
@@ -118,22 +115,21 @@ public class ProductController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getLowStockProducts(
             @RequestParam(defaultValue = "5") int threshold) {
-        List<ProductResponse> products = productService.getLowStockProducts(threshold);
-        return ResponseEntity.ok(ApiResponse.success("Low stock products fetched", products));
+        return ResponseEntity.ok(ApiResponse.success("Low stock products fetched",
+                productService.getLowStockProducts(threshold)));
     }
 
     @GetMapping("/out-of-stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<List<ProductResponse>>> getOutOfStockProducts() {
-        List<ProductResponse> products = productService.getOutOfStockProducts();
-        return ResponseEntity.ok(ApiResponse.success("Out of stock products fetched", products));
+        return ResponseEntity.ok(ApiResponse.success("Out of stock products fetched",
+                productService.getOutOfStockProducts()));
     }
 
     @PatchMapping("/{id}/stock")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> updateStock(
-            @PathVariable Long id,
-            @RequestParam int quantity) {
+            @PathVariable Long id, @RequestParam int quantity) {
         productService.restoreStock(id, quantity);
         return ResponseEntity.ok(ApiResponse.success("Stock updated successfully", null));
     }
@@ -141,19 +137,27 @@ public class ProductController {
     @PostMapping("/{id}/image")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<ProductResponse>> uploadImage(
-            @PathVariable Long id,
-            @RequestParam("file") MultipartFile file) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Image uploaded successfully",
+            @PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(ApiResponse.success("Image uploaded successfully",
                 productService.uploadProductImage(id, file)));
+    }
+
+    @GetMapping("/{id}/recommendations")
+    public ResponseEntity<ApiResponse<List<ProductResponse>>> getRecommendations(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "4") int limit) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Recommendations fetched", productService.getRecommendations(id, limit)));
     }
 
     @DeleteMapping("/{id}/image")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<ApiResponse<ProductResponse>> deleteImage(
-            @PathVariable Long id) {
-        return ResponseEntity.ok(ApiResponse.success(
-                "Image deleted successfully",
+    public ResponseEntity<ApiResponse<ProductResponse>> deleteImage(@PathVariable Long id) {
+        return ResponseEntity.ok(ApiResponse.success("Image deleted successfully",
                 productService.deleteProductImage(id)));
+    }
+
+    public ProductResponse getProductById(long l) {
+        return null;
     }
 }

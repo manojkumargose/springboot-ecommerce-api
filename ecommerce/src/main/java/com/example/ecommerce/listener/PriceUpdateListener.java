@@ -5,6 +5,8 @@ import com.example.ecommerce.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Caching;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,12 +24,23 @@ public class PriceUpdateListener {
                 message.getProductId(), message.getNewPrice());
 
         productRepository.findById(message.getProductId()).ifPresentOrElse(product -> {
-            // Update the live price in your main ecommerce database
             product.setPrice(message.getNewPrice());
             productRepository.save(product);
+
+            // Evict Redis cache so next fetch shows new price
+            evictProductCache(message.getProductId());
+
             log.info("✅ [MONOLITH] Product '{}' price updated successfully!", product.getName());
         }, () -> {
             log.error("❌ [MONOLITH] Price update failed: Product ID {} not found", message.getProductId());
         });
+    }
+
+    @Caching(evict = {
+            @CacheEvict(value = "product", key = "#productId"),
+            @CacheEvict(value = "products", allEntries = true)
+    })
+    public void evictProductCache(Long productId) {
+        log.debug("Cache evicted for product {}", productId);
     }
 }

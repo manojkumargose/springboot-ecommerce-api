@@ -5,14 +5,17 @@ import com.example.ecommerce.entity.PricingRule;
 import com.example.ecommerce.entity.Product;
 import com.example.ecommerce.entity.Product.DemandLevel;
 import com.example.ecommerce.exception.ResourceNotFoundException;
+import com.example.ecommerce.repository.DemandEventRepository;
 import com.example.ecommerce.repository.PricingRuleRepository;
 import com.example.ecommerce.repository.ProductRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -24,17 +27,61 @@ public class DynamicPricingService {
     private final ProductRepository productRepository;
     private final PricingRuleRepository pricingRuleRepository;
     private final DemandTrackingService demandTrackingService;
+    private final DemandEventRepository demandEventRepository;
 
     public DynamicPricingService(ProductRepository productRepository,
                                  PricingRuleRepository pricingRuleRepository,
-                                 DemandTrackingService demandTrackingService) {
+                                 DemandTrackingService demandTrackingService,
+                                 DemandEventRepository demandEventRepository) {
         this.productRepository = productRepository;
         this.pricingRuleRepository = pricingRuleRepository;
         this.demandTrackingService = demandTrackingService;
+        this.demandEventRepository = demandEventRepository;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    //  FIX #4: Increase interval to 5 minutes + early exit if no
+    //  recent demand events — stops hammering DB every 60 seconds
+    //  when nothing has changed.
+    // ═══════════════════════════════════════════════════════════════
+
+    @Scheduled(fixedRate = 300000) // every 5 minutes
+    public void scheduledPriceRecalculation() {
+        log.info("⏰ Scheduled price recalculation triggered...");
+        try {
+            // FIX #4: Early exit — skip the whole recalculation if there
+            // are no demand events in the last 24 hours.
+            PricingRule defaultRule = getDefaultRule();
+            LocalDateTime windowStart = LocalDateTime.now(ZoneOffset.UTC)
+                    .minusHours(defaultRule.getDemandWindowHours());
+            long recentEvents = demandEventRepository
+                    .countByCreatedAtAfter(windowStart);
+
+            if (recentEvents == 0) {
+                log.info("No recent demand events — skipping recalculation.");
+                return;
+            }
+
+            int adjusted = recalculateAllPrices();
+            if (adjusted > 0) {
+                log.info("✅ Auto-recalculation complete: {} products adjusted.", adjusted);
+            }
+        } catch (Exception e) {
+            log.error("❌ Scheduled recalculation failed: {}", e.getMessage(), e);
+        }
     }
 
     // ═══════════════════════════════════════════════════════════════
     //  CORE: Recalculate prices for ALL products
+    //
+    //  FIX #1: Use findAllWithCategory() (JOIN FETCH) instead of
+    //  findAll() — eliminates N lazy SELECT per product for category.
+    //
+    //  FIX #2: Pre-load ALL pricing rules into a Map before the loop
+    //  instead of calling findByCategoryIdAndIsActiveTrue() per
+    //  product — eliminates the duplicate per-product rule queries.
+    //
+    //  FIX #3: Only call saveAll() when at least one price changed.
     // ═══════════════════════════════════════════════════════════════
 
     @Transactional
@@ -44,19 +91,41 @@ public class DynamicPricingService {
         PricingRule defaultRule = getDefaultRule();
         int windowHours = defaultRule.getDemandWindowHours();
 
-        Map<Long, Long> demandScores = demandTrackingService.getWeightedDemandScores(windowHours);
+        // FIX #2: Load all active rules once, keyed by categoryId.
+        // null key = the global default rule (no category).
+        Map<Long, PricingRule> rulesByCategoryId = pricingRuleRepository
+                .findByIsActiveTrue()
+                .stream()
+                .filter(r -> r.getCategory() != null)
+                .collect(Collectors.toMap(
+                        r -> r.getCategory().getId(),
+                        r -> r,
+                        (existing, replacement) -> existing
+                ));
 
-        List<Product> products = productRepository.findAll();
+        Map<Long, Long> demandScores = demandTrackingService
+                .getWeightedDemandScores(windowHours);
+
+        // FIX #1: JOIN FETCH category — no lazy loads inside the loop.
+        List<Product> products = productRepository.findAllWithCategory();
         int adjustedCount = 0;
 
         for (Product product : products) {
-            PricingRule rule = findRuleForProduct(product, defaultRule);
+            // FIX #2: Rule lookup from pre-loaded map — zero extra queries.
+            PricingRule rule = (product.getCategory() != null)
+                    ? rulesByCategoryId.getOrDefault(
+                    product.getCategory().getId(), defaultRule)
+                    : defaultRule;
+
             long score = demandScores.getOrDefault(product.getId(), 0L);
             boolean changed = applyDynamicPrice(product, rule, score);
             if (changed) adjustedCount++;
         }
 
-        productRepository.saveAll(products);
+        // FIX #3: Skip the UPDATE statements entirely if nothing changed.
+        if (adjustedCount > 0) {
+            productRepository.saveAll(products);
+        }
 
         log.info("Price recalculation complete. {} out of {} products adjusted.",
                 adjustedCount, products.size());
@@ -77,9 +146,9 @@ public class DynamicPricingService {
 
         double multiplier;
         switch (level) {
-            case HIGH:   multiplier = rule.getHighDemandMultiplier(); break;
+            case HIGH:   multiplier = rule.getHighDemandMultiplier();   break;
             case MEDIUM: multiplier = rule.getMediumDemandMultiplier(); break;
-            case LOW:    multiplier = rule.getLowDemandMultiplier(); break;
+            case LOW:    multiplier = rule.getLowDemandMultiplier();    break;
             default:     multiplier = 1.0;
         }
 
@@ -88,7 +157,6 @@ public class DynamicPricingService {
         double maxPrice = basePrice * (1 + rule.getMaxPriceIncreasePercent() / 100.0);
         double minPrice = basePrice * (1 - rule.getMaxPriceDecreasePercent() / 100.0);
         newPrice = Math.max(minPrice, Math.min(maxPrice, newPrice));
-
         newPrice = Math.round(newPrice * 100.0) / 100.0;
 
         double changePercent = ((newPrice - basePrice) / basePrice) * 100.0;
@@ -98,7 +166,7 @@ public class DynamicPricingService {
         product.setDemandLevel(level);
         product.setDemandScore((int) demandScore);
         product.setPriceChangePercent(changePercent);
-        product.setLastPriceUpdate(LocalDateTime.now());
+        product.setLastPriceUpdate(LocalDateTime.now(ZoneOffset.UTC));
 
         boolean priceChanged = oldPrice == null || Math.abs(oldPrice - newPrice) > 0.01;
 
@@ -113,13 +181,9 @@ public class DynamicPricingService {
     }
 
     private DemandLevel determineDemandLevel(long score, PricingRule rule) {
-        if (score >= rule.getHighDemandThreshold()) {
-            return DemandLevel.HIGH;
-        } else if (score >= rule.getMediumDemandThreshold()) {
-            return DemandLevel.MEDIUM;
-        } else {
-            return DemandLevel.LOW;
-        }
+        if (score >= rule.getHighDemandThreshold())   return DemandLevel.HIGH;
+        if (score >= rule.getMediumDemandThreshold()) return DemandLevel.MEDIUM;
+        return DemandLevel.LOW;
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -129,7 +193,6 @@ public class DynamicPricingService {
     @Transactional
     public PricingRule createOrUpdateRule(PricingRuleRequest request) {
         PricingRule rule;
-
         if (request.getCategoryId() != null) {
             rule = pricingRuleRepository
                     .findByCategoryIdAndIsActiveTrue(request.getCategoryId())
@@ -149,12 +212,12 @@ public class DynamicPricingService {
         rule.setMaxPriceDecreasePercent(request.getMaxPriceDecreasePercent());
         rule.setDemandWindowHours(request.getDemandWindowHours());
         rule.setIsActive(true);
-
         return pricingRuleRepository.save(rule);
     }
 
     public PricingRule getDefaultRule() {
-        return pricingRuleRepository.findByCategoryIsNullAndIsActiveTrue()
+        return pricingRuleRepository
+                .findByCategoryIsNullAndIsActiveTrue()
                 .orElseGet(this::createDefaultRule);
     }
 
@@ -173,23 +236,25 @@ public class DynamicPricingService {
         return pricingRuleRepository.save(rule);
     }
 
-    private PricingRule findRuleForProduct(Product product, PricingRule defaultRule) {
-        if (product.getCategory() != null) {
-            return pricingRuleRepository
-                    .findByCategoryIdAndIsActiveTrue(product.getCategory().getId())
-                    .orElse(defaultRule);
-        }
-        return defaultRule;
-    }
-
     // ═══════════════════════════════════════════════════════════════
     //  Query methods (used by controller)
     // ═══════════════════════════════════════════════════════════════
 
     public ProductPricingResponse getProductPricing(Long productId) {
-        Product product = productRepository.findById(productId)
+        // FIX #1: Use findByIdWithCategory to avoid lazy load
+        Product product = productRepository.findByIdWithCategory(productId)
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found: " + productId));
+        return toProductPricingResponse(product);
+    }
 
+    public List<ProductPricingResponse> getAllProductPricing() {
+        // FIX #1: JOIN FETCH here too
+        return productRepository.findAllWithCategory().stream()
+                .map(this::toProductPricingResponse)
+                .collect(Collectors.toList());
+    }
+
+    private ProductPricingResponse toProductPricingResponse(Product product) {
         ProductPricingResponse response = new ProductPricingResponse();
         response.setProductId(product.getId());
         response.setProductName(product.getName());
@@ -202,28 +267,23 @@ public class DynamicPricingService {
         return response;
     }
 
-    public List<ProductPricingResponse> getAllProductPricing() {
-        return productRepository.findAll().stream()
-                .map(product -> {
-                    ProductPricingResponse response = new ProductPricingResponse();
-                    response.setProductId(product.getId());
-                    response.setProductName(product.getName());
-                    response.setBasePrice(product.getBasePrice());
-                    response.setCurrentPrice(product.getCurrentPrice());
-                    response.setPriceChangePercent(product.getPriceChangePercent());
-                    response.setDemandLevel(product.getDemandLevel());
-                    response.setDemandScore(product.getDemandScore());
-                    response.setLastPriceUpdate(product.getLastPriceUpdate());
-                    return response;
-                })
-                .collect(Collectors.toList());
-    }
+    // ═══════════════════════════════════════════════════════════════
+    //  FIX #5: getDemandAnalytics was calling productRepository
+    //  .findById(pid) inside a loop — one SELECT per trending product.
+    //  Fixed by loading all products into a Map once.
+    // ═══════════════════════════════════════════════════════════════
 
     public DemandAnalyticsResponse getDemandAnalytics() {
         PricingRule rule = getDefaultRule();
         int windowHours = rule.getDemandWindowHours();
 
-        List<Product> products = productRepository.findAll();
+        // FIX #1: JOIN FETCH — no lazy loads
+        List<Product> products = productRepository.findAllWithCategory();
+
+        // FIX #5: Pre-load into Map so we don't hit DB inside the loop
+        Map<Long, Product> productById = products.stream()
+                .collect(Collectors.toMap(Product::getId, p -> p));
+
         List<Object[]> trending = demandTrackingService.getTopTrending(windowHours, 10);
 
         long highCount = products.stream()
@@ -238,7 +298,8 @@ public class DynamicPricingService {
                 .map(row -> {
                     Long pid = (Long) row[0];
                     Long count = (Long) row[1];
-                    Product p = productRepository.findById(pid).orElse(null);
+                    // FIX #5: map lookup — zero extra DB queries
+                    Product p = productById.get(pid);
                     if (p == null) return null;
 
                     TrendingProductDto dto = new TrendingProductDto();

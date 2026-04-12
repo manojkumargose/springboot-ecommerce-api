@@ -2,6 +2,7 @@ package com.example.ecommerce.entity;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "demand_events", indexes = {
@@ -37,7 +38,7 @@ public class DemandEvent {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
+        this.createdAt = LocalDateTime.now(ZoneOffset.UTC);  // ✅ FIX: Use UTC to match Aiven Cloud DB
     }
 
     // ─── Constructors ────────────────────────────────────────

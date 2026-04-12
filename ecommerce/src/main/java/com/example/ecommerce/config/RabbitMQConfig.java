@@ -8,20 +8,19 @@ import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/**
- * Updated RabbitMQ configuration — includes the AI Pricing Feedback Loop.
- */
 @Configuration
 public class RabbitMQConfig {
 
     // ─── Existing E-commerce Exchange ────────────────────────
     public static final String EXCHANGE = "ecommerce.exchange";
 
-    // ─── 🚀 NEW: AI Pricing Exchange ──────────────────────────
-    // These must match exactly with what we set in the AI Service
+    // ─── AI Pricing Exchange ──────────────────────────────────
     public static final String PRICE_UPDATE_QUEUE = "price.update.queue";
     public static final String PRICE_UPDATE_EXCHANGE = "price.update.exchange";
     public static final String PRICE_UPDATE_ROUTING_KEY = "price.update.routingKey";
+
+    // ─── AI Demand Queue (Monolith → AI Service) ─────────────
+    public static final String AI_DEMAND_QUEUE = "demand-queue";
 
     // ─── Existing Queue Names ─────────────────────────────────
     public static final String ORDER_QUEUE = "ecommerce.order.queue";
@@ -30,7 +29,7 @@ public class RabbitMQConfig {
     public static final String DEMAND_QUEUE = "ecommerce.demand.queue";
     public static final String INVOICE_QUEUE = "ecommerce.invoice.queue";
 
-    // ─── Existing Routing Keys ────────────────────────────────
+    // ─── Routing Keys ─────────────────────────────────────────
     public static final String ORDER_PLACED_KEY = "order.placed";
     public static final String ORDER_CANCELLED_KEY = "order.cancelled";
     public static final String PAYMENT_COMPLETED_KEY = "payment.completed";
@@ -55,6 +54,11 @@ public class RabbitMQConfig {
     }
 
     @Bean
+    public Queue aiDemandQueue() {
+        return QueueBuilder.durable(AI_DEMAND_QUEUE).build();
+    }
+
+    @Bean
     public Queue orderQueue() { return QueueBuilder.durable(ORDER_QUEUE).build(); }
 
     @Bean
@@ -69,7 +73,7 @@ public class RabbitMQConfig {
     @Bean
     public Queue invoiceQueue() { return QueueBuilder.durable(INVOICE_QUEUE).build(); }
 
-    // ─── 🚀 NEW: AI Pricing Binding ──────────────────────────
+    // ─── AI Pricing Binding ──────────────────────────────────
 
     @Bean
     public Binding priceUpdateBinding() {

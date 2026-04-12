@@ -5,7 +5,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @SpringBootApplication
-@EnableScheduling
+@EnableScheduling  // ✅ FIX: This gives the pricing engine a heartbeat
 public class EcommerceApplication {
 
     public static void main(String[] args) {
