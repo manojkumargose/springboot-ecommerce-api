@@ -1,260 +1,406 @@
-\# ⚡ ShopAI — AI-Powered E-Commerce Platform
+# ⚡ ShopAI — AI-Powered E-Commerce Platform
 
+<p align="center">
+  <strong>A Full-Stack E-Commerce Platform Built with Java, Spring Boot, React, Microservices and Intelligent Dynamic Pricing.</strong>
+</p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Java-21-orange?logo=openjdk" />
+  <img src="https://img.shields.io/badge/Spring_Boot-3.2-green?logo=springboot" />
+  <img src="https://img.shields.io/badge/React-18-blue?logo=react" />
+  <img src="https://img.shields.io/badge/MySQL-8.0-blue?logo=mysql" />
+  <img src="https://img.shields.io/badge/Docker-Containerized-2496ED?logo=docker" />
+  <img src="https://img.shields.io/badge/Redis-Cache-red?logo=redis" />
+</p>
 
-!\[CI/CD](https://github.com/manojkumargose/springboot-ecommerce-api/actions/workflows/ci.yml/badge.svg)
+<p align="center">
+  <a href="https://github.com/manojkumargose/springboot-ecommerce-api/actions/workflows/ci.yml">
+    <img src="https://github.com/manojkumargose/springboot-ecommerce-api/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline">
+  </a>
+</p>
 
-!\[Java](https://img.shields.io/badge/Java-21-orange)
+---
 
-!\[Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-green)
+## 🚀 Overview
 
-!\[React](https://img.shields.io/badge/React-18-blue)
+**ShopAI** is a full-stack e-commerce platform designed to demonstrate modern backend engineering, distributed systems, and intelligent pricing strategies.
 
-!\[Docker](https://img.shields.io/badge/Docker-12%20Containers-2496ED)
+Unlike traditional e-commerce applications, ShopAI integrates a demand-based dynamic pricing engine that adjusts product prices according to stock consumption.
 
+The platform follows a microservices-oriented architecture and incorporates service discovery, API gateway routing, asynchronous messaging, caching, containerization, automated testing, and infrastructure monitoring.
 
+### ⭐ Key Highlights
 
-Full-stack e-commerce with \*\*AI dynamic pricing\*\*, \*\*microservices\*\*, and \*\*12-container Docker deployment\*\*.
+* Full-stack e-commerce application.
+* Demand-based dynamic pricing engine.
+* Microservices architecture using Spring Cloud.
+* Centralized API Gateway and Eureka Service Discovery.
+* Asynchronous communication using RabbitMQ.
+* Redis caching.
+* JWT-based authentication and authorization.
+* Docker Compose deployment with 12 containers.
+* Prometheus and Grafana monitoring.
+* GitHub Actions CI/CD pipeline.
+* 42 automated unit tests.
 
+---
 
+## 📸 Application Screenshots
 
-\---
+### 🛍️ Customer Interface
 
+**Product Listing**
 
+![Product View](images/frontend-product-view.png)
 
-\## 📸 Screenshots
+**Authentication**
 
+![Sign In](images/frontend-sign-in-page.png)
 
+### 🛠️ Admin Dashboard
 
-\### Frontend — Product View
+![Admin Panel](images/admin-pannel.png)
 
-!\[Products](images/frontend-product-view.png)
+### 🤖 Dynamic Pricing Analytics
 
+![AI Pricing](images/ai-pricing.png)
 
+### 📊 Infrastructure Monitoring
 
-\### Frontend — Sign In
+**Grafana Dashboard**
 
-!\[Sign In](images/frontend-sign-in-page.png)
+![Grafana](images/grafana-dashboard.png)
 
+**Prometheus Service Targets**
 
+![Prometheus](images/prometheus-targets.png)
 
-\### Admin Panel
+**Eureka Service Discovery**
 
-!\[Admin](images/admin-pannel.png)
+![Eureka](images/eureka-services.png)
 
+**RabbitMQ Management**
 
+![RabbitMQ](images/rabbitmq.png)
 
-\### AI Pricing Analytics
+**GitHub Actions CI/CD**
 
-!\[AI Pricing](images/ai-pricing.png)
+![CI/CD](images/github-actions.png)
 
+---
 
+## 🧰 Technology Stack
 
-\### Grafana Monitoring Dashboard
-
-!\[Grafana](images/grafana-dashboard.png)
-
-
-
-\### Prometheus Targets (All UP ✅)
-
-!\[Prometheus](images/prometheus-targets.png)
-
-
-
-\### Eureka Service Discovery
-
-!\[Eureka](images/eureka-services.png)
-
-
-
-\### RabbitMQ Message Broker
-
-!\[RabbitMQ](images/rabbitmq.png)
-
-
-
-\### CI/CD Pipeline (GitHub Actions)
-
-!\[CI/CD](images/github-actions.png)
-
-
-
-\---
-
-
-
-\## 🛠️ Tech Stack
-
-
-
-\*\*Backend:\*\* Java 21, Spring Boot 3.2, Spring Security, Spring Data JPA, JWT Auth
-
-\*\*Frontend:\*\* React 18, Tailwind CSS
-
-\*\*Microservices:\*\* Spring Cloud (Eureka, API Gateway), RabbitMQ, Redis
-
-\*\*AI:\*\* Stock-based dynamic pricing — `price = basePrice × (1 + 0.25 × percentSold)`
-
-\*\*Database:\*\* MySQL 8.0, Redis (cache)
-
-\*\*Monitoring:\*\* Prometheus, Grafana, Zipkin
-
-\*\*CI/CD:\*\* GitHub Actions (42 tests on every push)
-
-\*\*Infra:\*\* Docker Compose (12 containers), Kubernetes manifests
-
-
-
-\---
-
-
-
-\## 🏗️ Architecture
-
-
-
+| Category            | Technologies               |
+| ------------------- | -------------------------- |
+| Backend             | Java 21, Spring Boot 3.2   |
+| Frontend            | React 18, Tailwind CSS     |
+| Security            | Spring Security, JWT       |
+| ORM                 | Spring Data JPA, Hibernate |
+| Database            | MySQL 8.0                  |
+| Caching             | Redis                      |
+| API Gateway         | Spring Cloud Gateway       |
+| Service Discovery   | Netflix Eureka             |
+| Messaging           | RabbitMQ                   |
+| Monitoring          | Prometheus, Grafana        |
+| Distributed Tracing | Zipkin                     |
+| Testing             | JUnit 5, Mockito, AssertJ  |
+| CI/CD               | GitHub Actions             |
+| Containerization    | Docker, Docker Compose     |
+| Orchestration       | Kubernetes manifests       |
+
+---
+
+## 🏗️ System Architecture
+
+ShopAI uses a microservices-oriented architecture with centralized API routing and service discovery.
+
+```text
+                    ┌──────────────────┐
+                    │   React Frontend │
+                    │     Port 3001    │
+                    └────────┬─────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │    API Gateway   │
+                    │     Port 8084    │
+                    └────────┬─────────┘
+                             │
+                ┌────────────┴────────────┐
+                │                         │
+                ▼                         ▼
+       ┌─────────────────┐       ┌─────────────────┐
+       │ Ecommerce       │       │ AI Pricing      │
+       │ Application     │       │ Service         │
+       │ Port 8080       │       │ Port 8083       │
+       └────────┬────────┘       └────────┬────────┘
+                │                         │
+                ▼                         ▼
+       ┌─────────────────┐       ┌─────────────────┐
+       │ MySQL           │       │ Pricing MySQL   │
+       │ Redis           │       │ Database        │
+       └────────┬────────┘       └────────┬────────┘
+                │                         │
+                └────────────┬────────────┘
+                             │
+                             ▼
+                    ┌──────────────────┐
+                    │    RabbitMQ      │
+                    │ Message Broker   │
+                    └──────────────────┘
+
+
+       ┌────────────────────────────────────┐
+       │          Infrastructure            │
+       │                                    │
+       │ Eureka │ Prometheus │ Grafana      │
+       │ Zipkin │ Docker     │ Kubernetes   │
+       └────────────────────────────────────┘
 ```
 
-React UI (3001) → API Gateway (8084) → Eureka (8761)
+### Architecture Components
 
-&#x20;                       ↓
+| Component             | Responsibility                              |
+| --------------------- | ------------------------------------------- |
+| React Frontend        | Customer and admin interfaces               |
+| API Gateway           | Centralized API routing                     |
+| Eureka Server         | Service registration and discovery          |
+| Ecommerce Application | Product, authentication and cart operations |
+| AI Pricing Service    | Demand-based product pricing                |
+| MySQL                 | Persistent application data                 |
+| Redis                 | Caching                                     |
+| RabbitMQ              | Asynchronous messaging                      |
+| Prometheus            | Metrics collection                          |
+| Grafana               | Monitoring and visualization                |
+| Zipkin                | Distributed request tracing                 |
 
-&#x20;        ┌──────────────┴──────────────┐
+---
 
-&#x20;        ↓                             ↓
+## 🤖 Dynamic Pricing Engine
 
-&#x20;  Monolith (8080)            AI Pricing (8083)
+One of ShopAI's key features is its demand-based dynamic pricing engine.
 
-&#x20;  MySQL + Redis              MySQL (pricing\_db)
+The pricing mechanism adjusts product prices according to the percentage of available stock sold.
 
-&#x20;        └──────────┬─────────────────┘
+### Pricing Formula
 
-&#x20;                RabbitMQ
-
-&#x20;                   ↓
-
-&#x20;        Prometheus → Grafana → Zipkin
-
+```math
+Price = BasePrice × (1 + 0.25 × PercentSold)
 ```
 
+Where:
 
+* `BasePrice` = Original product price.
+* `PercentSold` = Proportion of initial stock sold.
+* `0.25` = Pricing adjustment coefficient.
 
-\---
+### Example
 
+Consider a product with:
 
+* Base Price: ₹1,000
+* Initial Stock: 50 units
 
-\## 🐳 Quick Start
+| Units Sold | Percentage Sold | Dynamic Price |
+| ---------- | --------------: | ------------: |
+| 10         |             20% |        ₹1,050 |
+| 25         |             50% |        ₹1,125 |
+| 40         |             80% |        ₹1,200 |
 
+When additional inventory is restocked, the pricing calculation can reflect the updated inventory position.
 
+**Note:** The current pricing mechanism is a rule-based demand pricing algorithm, not a trained machine learning model.
+
+---
+
+## 🔐 Security Features
+
+* JWT-based authentication.
+* Spring Security integration.
+* Role-based authorization.
+* Protected application endpoints.
+* Secure password handling.
+
+---
+
+## 🧪 Testing & Quality Assurance
+
+ShopAI includes automated unit testing using JUnit 5, Mockito, and AssertJ.
+
+**Current test suite: 42 unit tests**
+
+| Test Class                | Tests | Coverage                              |
+| ------------------------- | ----: | ------------------------------------- |
+| ProductServiceTest        |    20 | CRUD, pricing, stock, recommendations |
+| CartServiceTest           |     7 | Cart operations and stock validation  |
+| ProductTest               |     5 | Entity behavior and demand levels     |
+| ProductControllerTest     |     4 | Product API endpoints                 |
+| AuthControllerTest        |     4 | Registration and authentication       |
+| EventPublisherServiceTest |     2 | RabbitMQ event publishing             |
+
+### Run Tests
 
 ```bash
+cd ecommerce
+./mvnw test
+```
 
+---
+
+## ⚙️ CI/CD Pipeline
+
+ShopAI uses GitHub Actions to automate the testing workflow.
+
+### Pipeline Responsibilities
+
+* Automated build execution.
+* Maven test execution.
+* Unit test validation.
+* Build verification on code pushes.
+
+CI/CD configuration:
+
+```text
+.github/workflows/ci.yml
+```
+
+[View GitHub Actions](https://github.com/manojkumargose/springboot-ecommerce-api/actions)
+
+---
+
+## 🐳 Docker Deployment
+
+The application infrastructure is containerized using Docker Compose.
+
+### Prerequisites
+
+* Java 21
+* Docker Desktop
+* Git
+* Maven (optional when using Maven Wrapper)
+
+### Installation
+
+**1. Clone the repository**
+
+```bash
 git clone https://github.com/manojkumargose/springboot-ecommerce-api.git
-
-cd springboot-ecommerce-api/ecommerce/microservices
-
-docker-compose up -d
-
 ```
 
-
-
-Open http://localhost:3001 | Admin: `admin2` / `admin123`
-
-
-
-\---
-
-
-
-\## 🧪 Testing
-
-
-
-\*\*42 unit tests\*\* — JUnit 5 + Mockito + AssertJ
-
-
+**2. Navigate to the microservices directory**
 
 ```bash
-
-cd ecommerce \&\& ./mvnw test
-
+cd springboot-ecommerce-api/ecommerce/microservices
 ```
 
+**3. Start the application**
 
-
-| Test Class | Tests | Covers |
-
-|-----------|-------|--------|
-
-| ProductServiceTest | 20 | CRUD, AI pricing, stock, recommendations |
-
-| CartServiceTest | 7 | Add, remove, stock validation |
-
-| ProductTest | 5 | Entity, inStock, demand levels |
-
-| ProductControllerTest | 4 | API endpoints |
-
-| AuthControllerTest | 4 | Register, login |
-
-| EventPublisherServiceTest | 2 | RabbitMQ events |
-
-
-
-\---
-
-
-
-\## 📊 AI Pricing Formula
-
-
-
+```bash
+docker-compose up -d
 ```
 
-price = basePrice × (1 + 0.25 × percentSold)
+**4. Check running containers**
 
-
-
-Example: ₹1000 base, 50 stock
-
-&#x20; 10 sold → ₹1,050  |  25 sold → ₹1,125  |  40 sold → ₹1,200
-
-&#x20; Admin restocks → price drops back to ₹1,000
-
+```bash
+docker ps
 ```
 
+**5. Stop the application**
 
-
-\---
-
-
-
-\## 📁 Project Structure
-
-
-
+```bash
+docker-compose down
 ```
 
-├── .github/workflows/ci.yml     # CI/CD
+### Application Access
 
-├── ecommerce/                    # Spring Boot monolith + 42 tests
+| Service          | Local URL             |
+| ---------------- | --------------------- |
+| Frontend         | http://localhost:3001 |
+| Main Backend     | http://localhost:8080 |
+| API Gateway      | http://localhost:8084 |
+| Eureka Dashboard | http://localhost:8761 |
+| AI Pricing       | http://localhost:8083 |
 
-├── ecommerce-frontend/           # React + Tailwind
+*Actual availability depends on successful container startup and service configuration.*
 
-└── ecommerce/microservices/      # Eureka, Gateway, AI Pricing, Docker, K8s
+---
 
+## 📁 Project Structure
+
+```text
+springboot-ecommerce-api/
+│
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+│
+├── ecommerce/
+│   ├── src/
+│   │   ├── main/
+│   │   └── test/
+│   ├── pom.xml
+│   └── mvnw
+│
+├── ecommerce-frontend/
+│   ├── src/
+│   ├── public/
+│   └── package.json
+│
+└── ecommerce/
+    └── microservices/
+        ├── eureka-server/
+        ├── api-gateway/
+        ├── ai-pricing-service/
+        ├── docker-compose.yml
+        └── kubernetes/
 ```
 
+---
 
+## 🎯 Engineering Concepts Demonstrated
 
-\---
+Through ShopAI, the following engineering concepts are demonstrated:
 
+* REST API development.
+* Microservices communication.
+* Service registration and discovery.
+* API Gateway architecture.
+* Asynchronous event-driven communication.
+* Database integration and ORM.
+* Distributed caching.
+* Authentication and authorization.
+* Containerized application deployment.
+* Automated testing and CI/CD.
+* Application metrics and monitoring.
 
+---
 
-\## 👤 Author
+## 🔮 Future Enhancements
 
+Potential improvements for future development:
 
+* Machine learning-based demand forecasting.
+* Price elasticity estimation.
+* Personalized product recommendations.
+* Advanced inventory prediction.
+* Real-time analytics dashboard.
+* Kubernetes deployment automation.
+* Integration and performance testing.
+* Advanced observability and alerting.
 
-\*\*Manoj Kumar Gose\*\* — \[@manojkumargose](https://github.com/manojkumargose)
+---
 
+## 👨‍💻 Author
+
+**Manoj Kumar Gose**
+
+Java Backend Developer | AI/ML Enthusiast | Full-Stack Developer
+
+GitHub: [@manojkumargose](https://github.com/manojkumargose)
+
+---
+
+<p align="center">
+  <strong>Built with Java, Spring Boot, React and a passion for engineering.</strong>
+</p>
